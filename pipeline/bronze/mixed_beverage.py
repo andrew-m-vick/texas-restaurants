@@ -5,7 +5,7 @@ truncates bronze table and reloads (bronze is disposable by design).
 """
 import json
 from sqlalchemy import text
-from ..config import TX_MIXED_BEVERAGE_URL, HOUSTON_CITY_NAME
+from ..config import TX_MIXED_BEVERAGE_URL, TARGET_CITY_NAME
 from ..db import engine
 from ..ops import track_run
 from ..socrata import paginate
@@ -20,7 +20,7 @@ COLUMNS = [
 
 
 def run():
-    where = f"upper(location_city) = '{HOUSTON_CITY_NAME.upper()}'"
+    where = f"upper(location_city) = '{TARGET_CITY_NAME.upper()}'"
     with track_run("ingest_mixed_beverage", "bronze") as state, engine.begin() as conn:
         conn.execute(text("TRUNCATE bronze.mixed_beverage"))
         total = 0

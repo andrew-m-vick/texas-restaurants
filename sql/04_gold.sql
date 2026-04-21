@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS gold.monthly_movers (
     zip TEXT,
     month DATE,
     total_receipts NUMERIC(14,2),
-    pct_change NUMERIC(6,2),
+    pct_change NUMERIC(10,2),
     direction TEXT,
     PRIMARY KEY (establishment_id, month)
 );
