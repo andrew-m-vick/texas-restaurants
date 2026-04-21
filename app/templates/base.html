@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Houston Restaurant Analytics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <header>
+    <div class="brand">🍴 Houston Restaurant Analytics</div>
+    <nav>
+      {% set tabs = [
+        ('overview','Overview'),
+        ('revenue','Revenue'),
+        ('inspections','Inspections'),
+        ('correlation','Correlation'),
+        ('map','Map'),
+        ('ops','Pipeline'),
+      ] %}
+      {% for key, label in tabs %}
+        <a href="{{ url_for('main.' + ('map_view' if key=='map' else key)) }}"
+           class="{{ 'active' if active==key else '' }}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

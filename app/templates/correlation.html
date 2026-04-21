@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Inspection Score vs. Revenue</h1>
+<p class="muted">Each point is one matched establishment. Regression line shows the overall trend.</p>
+<div class="card"><canvas id="scatter"></canvas></div>
+<p id="corrStat" class="muted"></p>
+{% endblock %}
+{% block scripts %}<script>renderCorrelation();</script>{% endblock %}

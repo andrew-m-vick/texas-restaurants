@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Revenue Trends</h1>
+<div class="card"><h2>Total Monthly Receipts</h2><canvas id="monthly"></canvas></div>
+<div class="card"><h2>Revenue by ZIP</h2><canvas id="byZip"></canvas></div>
+{% endblock %}
+{% block scripts %}<script>renderRevenue();</script>{% endblock %}

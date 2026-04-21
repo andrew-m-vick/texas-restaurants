@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Neighborhood Map</h1>
+<div class="toolbar">
+  <label><input type="radio" name="metric" value="revenue" checked> Revenue intensity</label>
+  <label><input type="radio" name="metric" value="score"> Inspection score</label>
+</div>
+<div id="map" style="height: 600px;"></div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+<script>renderMap();</script>
+{% endblock %}
