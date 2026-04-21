@@ -1,4 +1,4 @@
-"""bronze.inspections -> silver.inspections (Austin schema)."""
+"""bronze.inspections -> silver.inspections (unified across cities)."""
 import pandas as pd
 from sqlalchemy import text
 from ..db import engine
@@ -16,18 +16,21 @@ def run():
 
         df["inspection_date"] = pd.to_datetime(df["inspection_date"], errors="coerce").dt.date
         df["score"] = pd.to_numeric(df["score"], errors="coerce")
+        df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+        df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
         df["zip"] = df["zip_code"].map(zip5)
         df["name_key"] = df["restaurant_name"].map(normalize_name)
         df["address_key"] = df["address"].map(normalize_address)
 
         df = df.dropna(subset=["restaurant_name", "facility_id"])
+        df["inspection_type"] = df["inspection_type"].fillna("Routine")
         df = df.drop_duplicates(
-            subset=["facility_id", "inspection_date", "process_description"]
+            subset=["city", "facility_id", "inspection_date", "inspection_type"]
         )
 
         keep = [
-            "facility_id", "restaurant_name", "address", "zip",
-            "inspection_date", "score", "process_description",
+            "city", "facility_id", "restaurant_name", "address", "zip",
+            "inspection_date", "score", "inspection_type", "latitude", "longitude",
             "name_key", "address_key",
         ]
         with engine.begin() as conn:
@@ -37,7 +40,8 @@ def run():
             if_exists="append", index=False, method="multi", chunksize=5000,
         )
         state["rows"] = len(df)
-    print(f"silver.inspections: {len(df)} rows")
+    print(f"silver.inspections: {len(df)} rows "
+          f"({dict(df['city'].value_counts())})")
 
 
 if __name__ == "__main__":

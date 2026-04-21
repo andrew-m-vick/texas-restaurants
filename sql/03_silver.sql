@@ -1,14 +1,17 @@
--- Silver: cleaned, typed, deduped.
+-- Silver: cleaned, typed, deduped — city-dimensioned.
 
 DROP TABLE IF EXISTS silver.violations;
+DROP TABLE IF EXISTS silver.establishments;
+DROP TABLE IF EXISTS silver.inspections;
+DROP TABLE IF EXISTS silver.mixed_beverage;
 
-CREATE TABLE IF NOT EXISTS silver.mixed_beverage (
+CREATE TABLE silver.mixed_beverage (
     id BIGSERIAL PRIMARY KEY,
+    city TEXT NOT NULL,
     taxpayer_number TEXT,
     location_number TEXT,
     location_name TEXT NOT NULL,
     location_address TEXT,
-    location_city TEXT,
     location_zip TEXT,
     obligation_end_date DATE NOT NULL,
     liquor_receipts NUMERIC(14,2) DEFAULT 0,
@@ -21,34 +24,55 @@ CREATE TABLE IF NOT EXISTS silver.mixed_beverage (
     UNIQUE (taxpayer_number, location_number, obligation_end_date)
 );
 
-CREATE INDEX IF NOT EXISTS idx_silver_mb_keys ON silver.mixed_beverage (name_key, address_key);
-CREATE INDEX IF NOT EXISTS idx_silver_mb_zip_date ON silver.mixed_beverage (location_zip, obligation_end_date);
+CREATE INDEX idx_silver_mb_city ON silver.mixed_beverage (city);
+CREATE INDEX idx_silver_mb_keys ON silver.mixed_beverage (city, name_key, address_key);
+CREATE INDEX idx_silver_mb_zip_date ON silver.mixed_beverage (city, location_zip, obligation_end_date);
 
--- One row per inspection event. Austin provides a score per inspection, no violation detail.
-CREATE TABLE IF NOT EXISTS silver.inspections (
+CREATE TABLE silver.inspections (
     id BIGSERIAL PRIMARY KEY,
+    city TEXT NOT NULL,
     facility_id TEXT NOT NULL,
     restaurant_name TEXT NOT NULL,
     address TEXT,
     zip TEXT,
     inspection_date DATE,
     score NUMERIC(5,2),
-    process_description TEXT,
+    inspection_type TEXT,
+    latitude NUMERIC(9,6),
+    longitude NUMERIC(9,6),
     name_key TEXT,
     address_key TEXT,
-    UNIQUE (facility_id, inspection_date, process_description)
+    UNIQUE (city, facility_id, inspection_date, inspection_type)
 );
 
-CREATE INDEX IF NOT EXISTS idx_silver_insp_keys ON silver.inspections (name_key, address_key);
-CREATE INDEX IF NOT EXISTS idx_silver_insp_zip_date ON silver.inspections (zip, inspection_date);
-CREATE INDEX IF NOT EXISTS idx_silver_insp_facility ON silver.inspections (facility_id);
+CREATE INDEX idx_silver_insp_city ON silver.inspections (city);
+CREATE INDEX idx_silver_insp_keys ON silver.inspections (city, name_key, address_key);
+CREATE INDEX idx_silver_insp_zip_date ON silver.inspections (city, zip, inspection_date);
+CREATE INDEX idx_silver_insp_facility ON silver.inspections (city, facility_id);
 
--- Unified establishment identity produced by fuzzy matcher.
-CREATE TABLE IF NOT EXISTS silver.establishments (
+-- Only Dallas publishes violation detail. One row per violation.
+CREATE TABLE silver.violations (
     id BIGSERIAL PRIMARY KEY,
+    city TEXT NOT NULL,
+    facility_id TEXT NOT NULL,
+    inspection_date DATE,
+    description TEXT,
+    points NUMERIC(5,2),
+    memo TEXT
+);
+
+CREATE INDEX idx_silver_viol_facility ON silver.violations (city, facility_id);
+CREATE INDEX idx_silver_viol_date ON silver.violations (city, inspection_date);
+
+-- Unified establishment identity, one row per matched/partial-matched entity.
+CREATE TABLE silver.establishments (
+    id BIGSERIAL PRIMARY KEY,
+    city TEXT NOT NULL,
     canonical_name TEXT NOT NULL,
     canonical_address TEXT,
     zip TEXT,
+    latitude NUMERIC(9,6),
+    longitude NUMERIC(9,6),
     mb_taxpayer_number TEXT,
     mb_location_number TEXT,
     facility_ids TEXT[],
@@ -56,4 +80,4 @@ CREATE TABLE IF NOT EXISTS silver.establishments (
     match_method TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_silver_est_zip ON silver.establishments (zip);
+CREATE INDEX idx_silver_est_city_zip ON silver.establishments (city, zip);

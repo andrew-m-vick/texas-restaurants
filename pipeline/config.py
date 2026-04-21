@@ -14,8 +14,15 @@ TX_MIXED_BEVERAGE_URL = os.getenv(
 AUSTIN_INSPECTIONS_URL = os.getenv(
     "AUSTIN_INSPECTIONS_URL", "https://data.austintexas.gov/resource/ecmv-9xxi.json"
 )
+DALLAS_INSPECTIONS_URL = os.getenv(
+    "DALLAS_INSPECTIONS_URL", "https://www.dallasopendata.com/resource/dri5-wcct.json"
+)
 
 SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN", "")
-TARGET_CITY_NAME = os.getenv("TARGET_CITY_NAME", "AUSTIN")
+TARGET_CITIES = [
+    c.strip().upper()
+    for c in os.getenv("TARGET_CITIES", "AUSTIN,DALLAS").split(",")
+    if c.strip()
+]
 
 PAGE_SIZE = 50_000

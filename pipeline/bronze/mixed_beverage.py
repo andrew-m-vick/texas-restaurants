@@ -1,11 +1,11 @@
-"""Ingest Texas Mixed Beverage Gross Receipts into bronze.mixed_beverage.
+"""Ingest Texas Mixed Beverage Gross Receipts for all configured TARGET_CITIES.
 
-Filters to Houston at the API level to keep payloads small. Re-runnable:
-truncates bronze table and reloads (bronze is disposable by design).
+Filters at the Socrata level to keep payloads small. Re-runnable:
+truncates bronze and reloads.
 """
 import json
 from sqlalchemy import text
-from ..config import TX_MIXED_BEVERAGE_URL, TARGET_CITY_NAME
+from ..config import TX_MIXED_BEVERAGE_URL, TARGET_CITIES
 from ..db import engine
 from ..ops import track_run
 from ..socrata import paginate
@@ -20,7 +20,8 @@ COLUMNS = [
 
 
 def run():
-    where = f"upper(location_city) = '{TARGET_CITY_NAME.upper()}'"
+    city_list = ", ".join(f"'{c}'" for c in TARGET_CITIES)
+    where = f"upper(location_city) in ({city_list})"
     with track_run("ingest_mixed_beverage", "bronze") as state, engine.begin() as conn:
         conn.execute(text("TRUNCATE bronze.mixed_beverage"))
         total = 0
@@ -37,7 +38,7 @@ def run():
             total += len(rows)
             print(f"mixed_beverage: {total} rows")
         state["rows"] = total
-    print(f"done: {total} rows into bronze.mixed_beverage")
+    print(f"done: {total} rows into bronze.mixed_beverage (cities={TARGET_CITIES})")
 
 
 if __name__ == "__main__":

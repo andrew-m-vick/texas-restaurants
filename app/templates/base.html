@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Houston Restaurant Analytics</title>
+  <title>Texas Restaurant Analytics</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -11,7 +11,7 @@
 </head>
 <body>
   <header>
-    <div class="brand">Austin Restaurant Analytics</div>
+    <div class="brand">Texas Restaurant Analytics</div>
     <nav>
       {% set tabs = [
         ('overview','Overview'),
@@ -22,14 +22,33 @@
         ('ops','Pipeline'),
       ] %}
       {% for key, label in tabs %}
-        <a href="{{ url_for('main.' + ('map_view' if key=='map' else key)) }}"
+        <a href="{{ url_for('main.' + ('map_view' if key=='map' else key)) }}{% if selected_city != 'ALL' %}?city={{ selected_city }}{% endif %}"
            class="{{ 'active' if active==key else '' }}">{{ label }}</a>
       {% endfor %}
     </nav>
+    <div class="city-picker">
+      <label>City:</label>
+      <select id="citySelect">
+        <option value="ALL" {% if selected_city == 'ALL' %}selected{% endif %}>All</option>
+        {% for c in cities %}
+          <option value="{{ c }}" {% if selected_city == c %}selected{% endif %}>{{ c.title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </header>
   <main>
     {% block content %}{% endblock %}
   </main>
+  <script>
+    window.SELECTED_CITY = {{ selected_city|tojson }};
+    document.getElementById('citySelect').addEventListener('change', (e) => {
+      const v = e.target.value;
+      const url = new URL(window.location.href);
+      if (v === 'ALL') url.searchParams.delete('city');
+      else url.searchParams.set('city', v);
+      window.location.href = url.toString();
+    });
+  </script>
   <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>

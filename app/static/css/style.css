@@ -16,6 +16,12 @@ header {
   display: flex; align-items: center; gap: 2rem;
   padding: 1rem 2rem; background: var(--panel); border-bottom: 1px solid var(--border);
 }
+nav { flex: 1; }
+.city-picker label { color: var(--muted); margin-right: 0.5rem; font-size: 0.85rem; }
+.city-picker select {
+  background: #222836; color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0.35rem 0.6rem; font-size: 0.9rem;
+}
 .brand { font-weight: 700; font-size: 1.1rem; }
 nav a {
   color: var(--muted); text-decoration: none; margin-right: 1rem;
@@ -30,6 +36,7 @@ h2 { font-size: 1rem; margin: 0 0 1rem; color: var(--muted); text-transform: upp
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem;
 }
+.card canvas { max-height: 320px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 .kpis {

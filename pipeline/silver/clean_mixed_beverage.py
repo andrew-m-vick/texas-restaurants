@@ -13,7 +13,6 @@ def run():
             print("no bronze mixed_beverage rows")
             return
 
-        # TX portal returns ISO timestamps despite the column name.
         df["obligation_end_date"] = pd.to_datetime(
             df["obligation_end_date_yyyymmdd"], errors="coerce"
         ).dt.date
@@ -21,6 +20,7 @@ def run():
                   "cover_charge_receipts", "total_receipts"]:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
+        df["city"] = df["location_city"].str.upper()
         df["location_zip"] = df["location_zip"].map(zip5)
         df["name_key"] = df["location_name"].map(normalize_name)
         df["address_key"] = df["location_address"].map(normalize_address)
@@ -31,11 +31,10 @@ def run():
         )
 
         keep = [
-            "taxpayer_number", "location_number", "location_name",
-            "location_address", "location_city", "location_zip",
-            "obligation_end_date", "liquor_receipts", "wine_receipts",
-            "beer_receipts", "cover_charge_receipts", "total_receipts",
-            "name_key", "address_key",
+            "city", "taxpayer_number", "location_number", "location_name",
+            "location_address", "location_zip", "obligation_end_date",
+            "liquor_receipts", "wine_receipts", "beer_receipts",
+            "cover_charge_receipts", "total_receipts", "name_key", "address_key",
         ]
         with engine.begin() as conn:
             conn.execute(text("TRUNCATE silver.mixed_beverage RESTART IDENTITY"))
@@ -44,7 +43,7 @@ def run():
             if_exists="append", index=False, method="multi", chunksize=5000,
         )
         state["rows"] = len(df)
-    print(f"silver.mixed_beverage: {len(df)} rows")
+    print(f"silver.mixed_beverage: {len(df)} rows across {df['city'].nunique()} cities")
 
 
 if __name__ == "__main__":
