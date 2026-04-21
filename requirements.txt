@@ -6,5 +6,4 @@ requests==2.32.3
 rapidfuzz==3.9.7
 pgeocode==0.5.0
 python-dotenv==1.0.1
-apache-airflow==2.9.3
 gunicorn==22.0.0

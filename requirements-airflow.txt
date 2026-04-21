@@ -1,0 +1,4 @@
+# Install separately: `pip install -r requirements-airflow.txt`
+# Airflow has tight dependency pins that can conflict with the base
+# environment, so it's isolated here.
+apache-airflow==2.9.3

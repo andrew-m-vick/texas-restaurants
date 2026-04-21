@@ -1,4 +1,5 @@
 from datetime import datetime
+import _bootstrap  # noqa: F401
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
