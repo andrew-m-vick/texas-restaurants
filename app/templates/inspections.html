@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Inspection Analysis</h1>
-<div class="grid-2">
-  <div class="card"><h2>Score Distribution</h2><canvas id="scoreDist"></canvas></div>
-  <div class="card"><h2>Top Violations</h2><canvas id="topViolations"></canvas></div>
-</div>
+<div class="card"><h2>Score Distribution</h2><canvas id="scoreDist"></canvas></div>
 <div class="card">
-  <h2>Repeat Offenders</h2>
+  <h2>Repeat Low-Score Establishments</h2>
+  <p class="muted">Establishments with two or more inspections scoring below 85.</p>
   <table id="repeatOffenders">
-    <thead><tr><th>Name</th><th>ZIP</th><th>Violations</th><th>Avg Score</th></tr></thead>
+    <thead>
+      <tr><th>Name</th><th>ZIP</th><th>Inspections</th><th>Low Scores</th><th>Avg</th><th>Min</th></tr>
+    </thead>
     <tbody></tbody>
   </table>
 </div>

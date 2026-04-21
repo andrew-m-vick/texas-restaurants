@@ -1,5 +1,7 @@
 -- Silver: cleaned, typed, deduped.
 
+DROP TABLE IF EXISTS silver.violations;
+
 CREATE TABLE IF NOT EXISTS silver.mixed_beverage (
     id BIGSERIAL PRIMARY KEY,
     taxpayer_number TEXT,
@@ -22,36 +24,24 @@ CREATE TABLE IF NOT EXISTS silver.mixed_beverage (
 CREATE INDEX IF NOT EXISTS idx_silver_mb_keys ON silver.mixed_beverage (name_key, address_key);
 CREATE INDEX IF NOT EXISTS idx_silver_mb_zip_date ON silver.mixed_beverage (location_zip, obligation_end_date);
 
+-- One row per inspection event. Austin provides a score per inspection, no violation detail.
 CREATE TABLE IF NOT EXISTS silver.inspections (
     id BIGSERIAL PRIMARY KEY,
-    source_id TEXT UNIQUE,
-    establishment_name TEXT NOT NULL,
+    facility_id TEXT NOT NULL,
+    restaurant_name TEXT NOT NULL,
     address TEXT,
     zip TEXT,
     inspection_date DATE,
-    inspection_type TEXT,
     score NUMERIC(5,2),
-    grade TEXT,
-    latitude NUMERIC(9,6),
-    longitude NUMERIC(9,6),
+    process_description TEXT,
     name_key TEXT,
-    address_key TEXT
+    address_key TEXT,
+    UNIQUE (facility_id, inspection_date, process_description)
 );
 
 CREATE INDEX IF NOT EXISTS idx_silver_insp_keys ON silver.inspections (name_key, address_key);
 CREATE INDEX IF NOT EXISTS idx_silver_insp_zip_date ON silver.inspections (zip, inspection_date);
-
-CREATE TABLE IF NOT EXISTS silver.violations (
-    id BIGSERIAL PRIMARY KEY,
-    source_id TEXT UNIQUE,
-    inspection_source_id TEXT,
-    violation_code TEXT,
-    violation_description TEXT,
-    violation_date DATE,
-    severity TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_silver_viol_insp ON silver.violations (inspection_source_id);
+CREATE INDEX IF NOT EXISTS idx_silver_insp_facility ON silver.inspections (facility_id);
 
 -- Unified establishment identity produced by fuzzy matcher.
 CREATE TABLE IF NOT EXISTS silver.establishments (
@@ -59,11 +49,9 @@ CREATE TABLE IF NOT EXISTS silver.establishments (
     canonical_name TEXT NOT NULL,
     canonical_address TEXT,
     zip TEXT,
-    latitude NUMERIC(9,6),
-    longitude NUMERIC(9,6),
     mb_taxpayer_number TEXT,
     mb_location_number TEXT,
-    inspection_source_ids TEXT[],
+    facility_ids TEXT[],
     match_score NUMERIC(5,2),
     match_method TEXT
 );

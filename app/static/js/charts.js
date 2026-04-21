@@ -66,17 +66,16 @@ async function renderInspections() {
       datasets: [{ data: d.distribution.map(r => r.inspections), backgroundColor: palette }]
     }
   });
-  new Chart(document.getElementById('topViolations'), {
-    type: 'bar',
-    data: {
-      labels: d.top_violations.map(r => r.violation_code || '—'),
-      datasets: [{ label: 'Occurrences', data: d.top_violations.map(r => r.occurrences), backgroundColor: palette[1] }]
-    },
-    options: { indexAxis: 'y', plugins: { legend: { display: false } } }
-  });
   const tbody = document.querySelector('#repeatOffenders tbody');
   tbody.innerHTML = d.repeat_offenders.map(r => `
-    <tr><td>${r.canonical_name}</td><td>${r.zip||''}</td><td>${r.violation_count}</td><td>${r.avg_score ?? ''}</td></tr>
+    <tr>
+      <td>${r.canonical_name}</td>
+      <td>${r.zip||''}</td>
+      <td>${r.inspection_count}</td>
+      <td>${r.low_score_count}</td>
+      <td>${r.avg_score ?? ''}</td>
+      <td>${r.min_score ?? ''}</td>
+    </tr>
   `).join('');
 }
 

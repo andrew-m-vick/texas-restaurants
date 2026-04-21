@@ -1,6 +1,6 @@
 async function renderMap() {
   const d = await (await fetch('/api/map')).json();
-  const map = L.map('map').setView([29.76, -95.37], 10);
+  const map = L.map('map').setView([30.27, -97.74], 11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap', maxZoom: 19
   }).addTo(map);

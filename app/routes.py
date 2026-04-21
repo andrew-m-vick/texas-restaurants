@@ -83,15 +83,13 @@ def api_revenue():
 @bp.route("/api/inspections")
 def api_inspections():
     dist = _fetch("SELECT * FROM gold.inspection_score_distribution ORDER BY score_bucket")
-    top_violations = _fetch("""
-        SELECT violation_code, violation_description, occurrences
-        FROM gold.top_violations ORDER BY occurrences DESC LIMIT 15
-    """)
     repeat = _fetch("""
-        SELECT canonical_name, zip, violation_count, avg_score
-        FROM gold.repeat_offenders ORDER BY violation_count DESC LIMIT 25
+        SELECT canonical_name, zip, inspection_count, low_score_count, avg_score, min_score
+        FROM gold.repeat_offenders
+        ORDER BY low_score_count DESC, avg_score ASC
+        LIMIT 25
     """)
-    return jsonify(distribution=dist, top_violations=top_violations, repeat_offenders=repeat)
+    return jsonify(distribution=dist, repeat_offenders=repeat)
 
 
 @bp.route("/api/correlation")
@@ -124,10 +122,8 @@ def api_ops():
     counts = _fetch("""
         SELECT 'bronze.mixed_beverage' AS tbl, count(*) AS n FROM bronze.mixed_beverage
         UNION ALL SELECT 'bronze.inspections', count(*) FROM bronze.inspections
-        UNION ALL SELECT 'bronze.violations', count(*) FROM bronze.violations
         UNION ALL SELECT 'silver.mixed_beverage', count(*) FROM silver.mixed_beverage
         UNION ALL SELECT 'silver.inspections', count(*) FROM silver.inspections
-        UNION ALL SELECT 'silver.violations', count(*) FROM silver.violations
         UNION ALL SELECT 'silver.establishments', count(*) FROM silver.establishments
         UNION ALL SELECT 'gold.revenue_by_zip_month', count(*) FROM gold.revenue_by_zip_month
         UNION ALL SELECT 'gold.score_revenue_correlation', count(*) FROM gold.score_revenue_correlation

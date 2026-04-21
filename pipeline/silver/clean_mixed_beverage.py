@@ -13,9 +13,10 @@ def run():
             print("no bronze mixed_beverage rows")
             return
 
+        # TX portal returns ISO timestamps despite the column name.
         df["obligation_end_date"] = pd.to_datetime(
-            df["obligation_end_date_yyyymmdd"], format="%Y%m%d", errors="coerce"
-        )
+            df["obligation_end_date_yyyymmdd"], errors="coerce"
+        ).dt.date
         for c in ["liquor_receipts", "wine_receipts", "beer_receipts",
                   "cover_charge_receipts", "total_receipts"]:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)

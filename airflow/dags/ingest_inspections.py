@@ -7,7 +7,7 @@ from pipeline.bronze.inspections import run as ingest_insp
 
 with DAG(
     dag_id="ingest_inspections",
-    description="Weekly ingest of Houston food service inspections + violations",
+    description="Weekly ingest of Austin food establishment inspection scores",
     schedule="@weekly",
     start_date=datetime(2024, 1, 1),
     catchup=False,

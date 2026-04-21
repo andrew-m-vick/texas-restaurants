@@ -1,17 +1,18 @@
-"""Fuzzy-match mixed beverage locations to inspection establishments.
+"""Fuzzy-match mixed beverage locations to Austin inspection facilities.
 
 Strategy (blocked fuzzy join — the interview-worthy bit):
-1. Block by ZIP. Restaurants in different ZIPs are not the same establishment.
-2. Within a ZIP block, use rapidfuzz.process.cdist on (name_key, address_key)
-   to compute a composite similarity score.
-3. Use Hungarian-style greedy assignment: for each MB row, pick the best
-   inspection candidate above the threshold, then remove that candidate so
-   it can't be matched twice.
-4. Emit a unified `silver.establishments` table with provenance (match_score,
-   match_method) so gold-layer analysis can filter by match confidence.
+1. Collapse inspections down to distinct facilities (one row per facility_id).
+2. Block by ZIP. Restaurants in different ZIPs are not the same establishment.
+3. Within a ZIP block, score (name_key, address_key) pairs with rapidfuzz
+   under a weighted composite (0.6 * name + 0.4 * address).
+4. Greedy assignment with removal: for each MB row, pick the best inspection
+   candidate above the threshold, then remove that candidate so it can't be
+   matched twice.
+5. Emit silver.establishments with provenance (match_score, match_method)
+   so gold-layer analysis can filter by match confidence.
 
-Records that can't be confidently matched still get written — as one-sided
-rows — so downstream reports don't silently drop data.
+Records that can't be confidently matched are still written as one-sided rows
+so downstream reports don't silently drop data.
 """
 import pandas as pd
 from rapidfuzz import fuzz
@@ -34,26 +35,20 @@ def _match_block(mb_block: pd.DataFrame, insp_block: pd.DataFrame) -> list[dict]
     matches = []
     available = insp_block.to_dict("records")
     for _, m in mb_block.iterrows():
-        best = None
-        best_score = 0.0
-        best_idx = -1
+        best, best_score, best_idx = None, 0.0, -1
         for i, cand in enumerate(available):
             s = _score(m["name_key"], m["address_key"],
                       cand["name_key"], cand["address_key"])
             if s > best_score:
-                best_score = s
-                best = cand
-                best_idx = i
+                best, best_score, best_idx = cand, s, i
         if best and best_score >= THRESHOLD:
             matches.append({
                 "canonical_name": m["location_name"],
                 "canonical_address": m["location_address"],
                 "zip": m["location_zip"],
-                "latitude": best.get("latitude"),
-                "longitude": best.get("longitude"),
                 "mb_taxpayer_number": m["taxpayer_number"],
                 "mb_location_number": m["location_number"],
-                "inspection_source_ids": [best["source_id"]],
+                "facility_ids": [best["facility_id"]],
                 "match_score": round(best_score, 2),
                 "match_method": "fuzzy_zip_block",
             })
@@ -63,25 +58,20 @@ def _match_block(mb_block: pd.DataFrame, insp_block: pd.DataFrame) -> list[dict]
                 "canonical_name": m["location_name"],
                 "canonical_address": m["location_address"],
                 "zip": m["location_zip"],
-                "latitude": None,
-                "longitude": None,
                 "mb_taxpayer_number": m["taxpayer_number"],
                 "mb_location_number": m["location_number"],
-                "inspection_source_ids": [],
+                "facility_ids": [],
                 "match_score": round(best_score, 2) if best else 0.0,
                 "match_method": "mb_only",
             })
-    # Inspection-only rows (no MB match)
     for cand in available:
         matches.append({
-            "canonical_name": cand["establishment_name"],
+            "canonical_name": cand["restaurant_name"],
             "canonical_address": cand["address"],
             "zip": cand["zip"],
-            "latitude": cand.get("latitude"),
-            "longitude": cand.get("longitude"),
             "mb_taxpayer_number": None,
             "mb_location_number": None,
-            "inspection_source_ids": [cand["source_id"]],
+            "facility_ids": [cand["facility_id"]],
             "match_score": 0.0,
             "match_method": "inspection_only",
         })
@@ -96,31 +86,34 @@ def run():
             "FROM silver.mixed_beverage WHERE location_zip IS NOT NULL",
             engine,
         )
+        # Austin publishes repeated inspections per facility — collapse to one
+        # canonical row per facility for matching.
         insp = pd.read_sql(
-            "SELECT DISTINCT ON (name_key, address_key, zip) "
-            "source_id, establishment_name, address, zip, "
-            "latitude, longitude, name_key, address_key "
-            "FROM silver.inspections WHERE zip IS NOT NULL",
+            """
+            SELECT DISTINCT ON (facility_id)
+                facility_id, restaurant_name, address, zip, name_key, address_key
+            FROM silver.inspections
+            WHERE zip IS NOT NULL
+            ORDER BY facility_id, inspection_date DESC
+            """,
             engine,
         )
+
         all_rows: list[dict] = []
         for zip_code, mb_block in mb.groupby("location_zip"):
             insp_block = insp[insp["zip"] == zip_code]
             all_rows.extend(_match_block(mb_block, insp_block))
-        # Inspection-only ZIPs (no MB records in that ZIP at all)
+
         missing_zips = set(insp["zip"].unique()) - set(mb["location_zip"].unique())
         for z in missing_zips:
-            insp_block = insp[insp["zip"] == z]
-            for cand in insp_block.to_dict("records"):
+            for cand in insp[insp["zip"] == z].to_dict("records"):
                 all_rows.append({
-                    "canonical_name": cand["establishment_name"],
+                    "canonical_name": cand["restaurant_name"],
                     "canonical_address": cand["address"],
                     "zip": cand["zip"],
-                    "latitude": cand.get("latitude"),
-                    "longitude": cand.get("longitude"),
                     "mb_taxpayer_number": None,
                     "mb_location_number": None,
-                    "inspection_source_ids": [cand["source_id"]],
+                    "facility_ids": [cand["facility_id"]],
                     "match_score": 0.0,
                     "match_method": "inspection_only",
                 })

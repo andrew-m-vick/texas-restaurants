@@ -1,5 +1,7 @@
 -- Bronze: raw landing tables. Schema-on-read where possible; JSONB for flexibility.
 
+DROP TABLE IF EXISTS bronze.violations;
+
 CREATE TABLE IF NOT EXISTS bronze.mixed_beverage (
     taxpayer_number TEXT,
     taxpayer_name TEXT,
@@ -28,34 +30,16 @@ CREATE INDEX IF NOT EXISTS idx_bronze_mb_city ON bronze.mixed_beverage (location
 CREATE INDEX IF NOT EXISTS idx_bronze_mb_date ON bronze.mixed_beverage (obligation_end_date_yyyymmdd);
 
 CREATE TABLE IF NOT EXISTS bronze.inspections (
-    source_id TEXT,
-    establishment_name TEXT,
+    facility_id TEXT,
+    restaurant_name TEXT,
     address TEXT,
-    city TEXT,
-    zip TEXT,
+    zip_code TEXT,
     inspection_date TEXT,
-    inspection_type TEXT,
     score TEXT,
-    grade TEXT,
-    latitude TEXT,
-    longitude TEXT,
+    process_description TEXT,
     raw JSONB,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_bronze_insp_src ON bronze.inspections (source_id);
-
-CREATE TABLE IF NOT EXISTS bronze.violations (
-    source_id TEXT,
-    inspection_source_id TEXT,
-    establishment_name TEXT,
-    address TEXT,
-    violation_code TEXT,
-    violation_description TEXT,
-    violation_date TEXT,
-    severity TEXT,
-    raw JSONB,
-    ingested_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_bronze_viol_insp ON bronze.violations (inspection_source_id);
+CREATE INDEX IF NOT EXISTS idx_bronze_insp_facility ON bronze.inspections (facility_id);
+CREATE INDEX IF NOT EXISTS idx_bronze_insp_zip ON bronze.inspections (zip_code);
