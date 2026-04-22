@@ -30,12 +30,18 @@ def _window() -> str:
     return w if w in WINDOWS else "12m"
 
 
-def _window_params():
+def _window_predicate(col: str) -> tuple[str, dict]:
+    """Returns ('AND <col> >= cutoff', params) or ('', {}) for 'all' window."""
     w = _window()
     _, interval = WINDOWS[w]
     if interval is None:
         return "", {}
-    return "AND month >= (SELECT max(month) - interval :iv FROM gold.revenue_by_zip_month)", {"iv": interval}
+    return f"AND {col} >= (current_date - interval :win_iv)", {"win_iv": interval}
+
+
+def _window_params():
+    """Back-compat shim: window predicate on gold.revenue_by_zip_month.month."""
+    return _window_predicate("month")
 
 
 def _render(template: str, active: str):
@@ -101,49 +107,56 @@ def _city_clause(col: str = "city") -> str:
 @bp.route("/api/overview")
 def api_overview():
     c = _city()
-    w_sql, w_params = _window_params()
+    w_mb_sql, w_params = _window_predicate("obligation_end_date")
+    w_insp_sql, _ = _window_predicate("inspection_date")
     kpis = _fetch(
         f"""
         SELECT
           (SELECT count(*) FROM silver.establishments WHERE {_city_clause()}) AS establishments,
           (SELECT round(avg(score)::numeric, 2) FROM silver.inspections
-              WHERE score IS NOT NULL AND {_city_clause()}) AS avg_score,
-          (SELECT coalesce(sum(total_receipts), 0) FROM gold.revenue_by_zip_month
-              WHERE {_city_clause()} {w_sql}) AS total_receipts,
-          (SELECT count(*) FROM silver.inspections WHERE {_city_clause()}) AS inspections
+              WHERE score IS NOT NULL AND {_city_clause()} {w_insp_sql}) AS avg_score,
+          (SELECT coalesce(sum(total_receipts), 0) FROM silver.mixed_beverage
+              WHERE {_city_clause()} {w_mb_sql}) AS total_receipts,
+          (SELECT count(*) FROM silver.inspections
+              WHERE {_city_clause()} {w_insp_sql}) AS inspections
         """,
         city=c, **w_params,
     )
-    # Per-city KPIs for side-by-side view when no city filter is active.
     by_city = _fetch(
-        """
+        f"""
         SELECT city,
           (SELECT count(*) FROM silver.establishments e WHERE e.city = c.city) AS establishments,
           (SELECT round(avg(score)::numeric, 2) FROM silver.inspections i
-             WHERE i.city = c.city AND score IS NOT NULL) AS avg_score,
+             WHERE i.city = c.city AND score IS NOT NULL {w_insp_sql}) AS avg_score,
           (SELECT coalesce(sum(total_receipts), 0) FROM silver.mixed_beverage m
-             WHERE m.city = c.city) AS total_receipts,
-          (SELECT count(*) FROM silver.inspections i WHERE i.city = c.city) AS inspections
+             WHERE m.city = c.city {w_mb_sql}) AS total_receipts,
+          (SELECT count(*) FROM silver.inspections i
+             WHERE i.city = c.city {w_insp_sql}) AS inspections
         FROM (SELECT DISTINCT city FROM silver.establishments) c
         ORDER BY city
         """,
+        **w_params,
     )
+    w_month_sql, _ = _window_predicate("month")
     top_zips = _fetch(
         f"""
         SELECT city, zip, sum(total_receipts) AS receipts
-        FROM gold.revenue_by_zip_month WHERE {_city_clause()} {w_sql}
+        FROM gold.revenue_by_zip_month WHERE {_city_clause()} {w_month_sql}
         GROUP BY city, zip ORDER BY receipts DESC LIMIT 10
         """,
         city=c, **w_params,
     )
     bottom_zips = _fetch(
         f"""
-        SELECT city, zip, avg_score
-        FROM gold.neighborhood_heat
-        WHERE avg_score > 0 AND {_city_clause()}
+        SELECT city, zip, avg(score)::numeric(5,2) AS avg_score
+        FROM silver.inspections
+        WHERE zip IS NOT NULL AND score IS NOT NULL
+          AND {_city_clause()} {w_insp_sql}
+        GROUP BY city, zip
+        HAVING avg(score) > 0
         ORDER BY avg_score ASC LIMIT 10
         """,
-        city=c,
+        city=c, **w_params,
     )
     return jsonify(kpis=kpis[0] if kpis else {}, by_city=by_city,
                    top_zips=top_zips, bottom_zips=bottom_zips)
@@ -152,7 +165,7 @@ def api_overview():
 @bp.route("/api/revenue")
 def api_revenue():
     c = _city()
-    w_sql, w_params = _window_params()
+    w_sql, w_params = _window_predicate("month")
     monthly = _fetch(
         f"""
         SELECT month, city, sum(total_receipts) AS total
@@ -175,30 +188,54 @@ def api_revenue():
 @bp.route("/api/inspections")
 def api_inspections():
     c = _city()
+    w_sql, w_params = _window_predicate("inspection_date")
     dist = _fetch(
         f"""
-        SELECT score_bucket, sum(inspections) AS inspections, avg(pct)::numeric(5,2) AS pct
-        FROM gold.inspection_score_distribution WHERE {_city_clause()}
+        SELECT
+          CASE
+            WHEN score >= 95 THEN 'A (95-100)'
+            WHEN score >= 85 THEN 'B (85-94)'
+            WHEN score >= 75 THEN 'C (75-84)'
+            WHEN score >= 0  THEN 'D (<75)'
+            ELSE 'Unscored'
+          END AS score_bucket,
+          count(*) AS inspections
+        FROM silver.inspections
+        WHERE {_city_clause()} {w_sql}
         GROUP BY score_bucket ORDER BY score_bucket
         """,
-        city=c,
+        city=c, **w_params,
     )
     repeat = _fetch(
         f"""
-        SELECT establishment_id, city, canonical_name, zip,
-               inspection_count, low_score_count, avg_score, min_score
-        FROM gold.repeat_offenders WHERE {_city_clause()}
-        ORDER BY low_score_count DESC, avg_score ASC LIMIT 25
+        SELECT
+          e.id AS establishment_id,
+          e.city, e.canonical_name, e.zip,
+          count(i.id) AS inspection_count,
+          count(*) FILTER (WHERE i.score < 85) AS low_score_count,
+          avg(i.score)::numeric(5,2) AS avg_score,
+          min(i.score)::numeric(5,2) AS min_score
+        FROM silver.establishments e
+        JOIN silver.inspections i
+          ON i.city = e.city AND i.facility_id = ANY(e.facility_ids)
+        WHERE {_city_clause("e.city")} {w_sql.replace("inspection_date", "i.inspection_date")}
+        GROUP BY e.id, e.city, e.canonical_name, e.zip
+        HAVING count(*) FILTER (WHERE i.score < 85) >= 2
+        ORDER BY low_score_count DESC, avg_score ASC
+        LIMIT 25
         """,
-        city=c,
+        city=c, **w_params,
     )
     top_viol = _fetch(
         f"""
-        SELECT city, description, occurrences, distinct_establishments
-        FROM gold.top_violations WHERE {_city_clause()}
+        SELECT city, description, count(*) AS occurrences,
+               count(DISTINCT facility_id) AS distinct_establishments
+        FROM silver.violations
+        WHERE {_city_clause()} {w_sql}
+        GROUP BY city, description
         ORDER BY occurrences DESC LIMIT 15
         """,
-        city=c,
+        city=c, **w_params,
     )
     return jsonify(distribution=dist, repeat_offenders=repeat, top_violations=top_viol)
 
@@ -206,16 +243,39 @@ def api_inspections():
 @bp.route("/api/correlation")
 def api_correlation():
     c = _city()
+    w_insp_sql, w_params = _window_predicate("i.inspection_date")
+    w_mb_sql, _ = _window_predicate("mb.obligation_end_date")
     rows = _fetch(
         f"""
-        SELECT c.establishment_id, c.city, c.canonical_name, c.zip,
-               c.avg_score, c.avg_monthly_receipts, e.match_score
-        FROM gold.score_revenue_correlation c
-        JOIN silver.establishments e ON e.id = c.establishment_id
-        WHERE c.avg_score IS NOT NULL AND c.avg_monthly_receipts IS NOT NULL
-          AND {_city_clause("c.city")}
+        WITH scores AS (
+          SELECT e.id, avg(i.score) AS avg_score
+          FROM silver.establishments e
+          JOIN silver.inspections i
+            ON i.city = e.city AND i.facility_id = ANY(e.facility_ids)
+          WHERE TRUE {w_insp_sql}
+          GROUP BY e.id
+        ),
+        revenue AS (
+          SELECT e.id, avg(mb.total_receipts) AS avg_monthly_receipts
+          FROM silver.establishments e
+          JOIN silver.mixed_beverage mb
+            ON mb.city = e.city
+           AND mb.taxpayer_number = e.mb_taxpayer_number
+           AND mb.location_number = e.mb_location_number
+          WHERE TRUE {w_mb_sql}
+          GROUP BY e.id
+        )
+        SELECT e.id AS establishment_id, e.city, e.canonical_name, e.zip,
+               s.avg_score::numeric(5,2) AS avg_score,
+               r.avg_monthly_receipts::numeric(14,2) AS avg_monthly_receipts,
+               e.match_score
+        FROM silver.establishments e
+        JOIN scores s ON s.id = e.id
+        JOIN revenue r ON r.id = e.id
+        WHERE s.avg_score IS NOT NULL AND r.avg_monthly_receipts IS NOT NULL
+          AND {_city_clause("e.city")}
         """,
-        city=c,
+        city=c, **w_params,
     )
     return jsonify(points=rows)
 
@@ -223,13 +283,40 @@ def api_correlation():
 @bp.route("/api/map")
 def api_map():
     c = _city()
+    w_mb_sql, w_params = _window_predicate("mb.obligation_end_date")
+    w_insp_sql, _ = _window_predicate("i.inspection_date")
+    # Window-scoped aggregates from silver, joined to gold.neighborhood_heat
+    # for the pgeocode-derived ZIP centroids.
     rows = _fetch(
         f"""
-        SELECT city, zip, establishments, avg_score, total_receipts, latitude, longitude
-        FROM gold.neighborhood_heat
-        WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND {_city_clause()}
+        WITH rev AS (
+          SELECT mb.city, mb.location_zip AS zip,
+                 count(DISTINCT (mb.taxpayer_number, mb.location_number)) AS establishments,
+                 sum(mb.total_receipts) AS total_receipts
+          FROM silver.mixed_beverage mb
+          WHERE mb.location_zip IS NOT NULL {w_mb_sql}
+          GROUP BY mb.city, mb.location_zip
+        ),
+        scr AS (
+          SELECT i.city, i.zip, avg(i.score)::numeric(5,2) AS avg_score
+          FROM silver.inspections i
+          WHERE i.zip IS NOT NULL AND i.score IS NOT NULL {w_insp_sql}
+          GROUP BY i.city, i.zip
+        )
+        SELECT COALESCE(rev.city, scr.city) AS city,
+               COALESCE(rev.zip, scr.zip) AS zip,
+               COALESCE(rev.establishments, 0) AS establishments,
+               COALESCE(scr.avg_score, 0) AS avg_score,
+               COALESCE(rev.total_receipts, 0) AS total_receipts,
+               nh.latitude, nh.longitude
+        FROM rev FULL OUTER JOIN scr USING (city, zip)
+        JOIN gold.neighborhood_heat nh
+          ON nh.city = COALESCE(rev.city, scr.city)
+         AND nh.zip  = COALESCE(rev.zip, scr.zip)
+        WHERE nh.latitude IS NOT NULL AND nh.longitude IS NOT NULL
+          AND {_city_clause("COALESCE(rev.city, scr.city)")}
         """,
-        city=c,
+        city=c, **w_params,
     )
     return jsonify(zips=rows)
 
@@ -358,6 +445,10 @@ def api_establishments():
     outer_where = ("WHERE " + " AND ".join(score_filters)) if score_filters else ""
     offset = (page - 1) * per_page
 
+    w_insp_sql, w_params = _window_predicate("i.inspection_date")
+    w_mb_sql, _ = _window_predicate("mb.obligation_end_date")
+    params.update(w_params)
+
     rows = _fetch(
         f"""
         WITH base AS (
@@ -365,13 +456,13 @@ def api_establishments():
             e.id, e.canonical_name, e.canonical_address, e.city, e.zip,
             e.match_method, e.match_score,
             (SELECT count(*) FROM silver.inspections i
-               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids)) AS inspection_count,
+               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids) {w_insp_sql}) AS inspection_count,
             (SELECT avg(score)::numeric(5,2) FROM silver.inspections i
-               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids)) AS avg_score,
+               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids) {w_insp_sql}) AS avg_score,
             (SELECT avg(mb.total_receipts)::numeric(14,2) FROM silver.mixed_beverage mb
                WHERE mb.city = e.city
                  AND mb.taxpayer_number = e.mb_taxpayer_number
-                 AND mb.location_number = e.mb_location_number) AS avg_monthly_receipts
+                 AND mb.location_number = e.mb_location_number {w_mb_sql}) AS avg_monthly_receipts
           FROM silver.establishments e
           WHERE {where_sql}
         )
@@ -388,7 +479,7 @@ def api_establishments():
         WITH base AS (
           SELECT e.id,
             (SELECT avg(score) FROM silver.inspections i
-               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids)) AS avg_score
+               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids) {w_insp_sql}) AS avg_score
           FROM silver.establishments e
           WHERE {where_sql}
         )
