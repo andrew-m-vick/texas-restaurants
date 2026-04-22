@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<div id="estBreadcrumbs" class="breadcrumbs"></div>
 <div id="estHeader"></div>
 <div class="grid-2">
   <div class="card"><h2>Inspection History</h2><canvas id="estScores"></canvas></div>
@@ -20,6 +21,11 @@
   const d = await (await fetch('/api/establishment/' + id)).json();
   if (d.error) { document.getElementById('estHeader').innerHTML = '<h1>Not found.</h1>'; return; }
   const h = d.header;
+  document.getElementById('estBreadcrumbs').innerHTML = `
+    <a href="/establishments">← Browse</a>
+    · <a href="/establishments?city=${h.city}">${h.city}</a>
+    ${h.zip ? `· <a href="/establishments?city=${h.city}&zip=${h.zip}">${h.zip}</a>` : ''}
+  `;
   document.getElementById('estHeader').innerHTML = `
     <h1>${h.canonical_name}</h1>
     <p class="muted">

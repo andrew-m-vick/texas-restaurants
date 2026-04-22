@@ -56,26 +56,49 @@ async function renderOverview() {
     `;
   }
 
+  const zipClickHandler = (rows) => (evt, active) => {
+    if (!active.length) return;
+    const r = rows[active[0].index];
+    window.location = `/establishments?zip=${r.zip}&city=${r.city}`;
+  };
+  const zipHoverHandler = (canvas) => (evt, active) => {
+    canvas.style.cursor = active.length ? 'pointer' : 'default';
+  };
+
   if (!d.top_zips.length) replaceWithEmpty('topZips', 'No revenue data for this selection.');
-  else new Chart(document.getElementById('topZips'), {
-    type: 'bar',
-    data: {
-      labels: d.top_zips.map(r => `${r.zip} (${r.city[0]})`),
-      datasets: [{ label: 'Revenue', data: d.top_zips.map(r => r.receipts),
-        backgroundColor: d.top_zips.map(r => cityColor[r.city] || palette[0]) }]
-    },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
-  });
+  else {
+    const el = document.getElementById('topZips');
+    new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: d.top_zips.map(r => `${r.zip} (${r.city[0]})`),
+        datasets: [{ label: 'Revenue', data: d.top_zips.map(r => r.receipts),
+          backgroundColor: d.top_zips.map(r => cityColor[r.city] || palette[0]) }]
+      },
+      options: {
+        maintainAspectRatio: false, plugins: { legend: { display: false } },
+        onClick: zipClickHandler(d.top_zips),
+        onHover: zipHoverHandler(el),
+      }
+    });
+  }
   if (!d.bottom_zips.length) replaceWithEmpty('bottomZips', 'No inspection data for this selection.');
-  else new Chart(document.getElementById('bottomZips'), {
-    type: 'bar',
-    data: {
-      labels: d.bottom_zips.map(r => `${r.zip} (${r.city[0]})`),
-      datasets: [{ label: 'Avg Score', data: d.bottom_zips.map(r => r.avg_score),
-        backgroundColor: d.bottom_zips.map(r => cityColor[r.city] || palette[1]) }]
-    },
-    options: { maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
-  });
+  else {
+    const el = document.getElementById('bottomZips');
+    new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: d.bottom_zips.map(r => `${r.zip} (${r.city[0]})`),
+        datasets: [{ label: 'Avg Score', data: d.bottom_zips.map(r => r.avg_score),
+          backgroundColor: d.bottom_zips.map(r => cityColor[r.city] || palette[1]) }]
+      },
+      options: {
+        maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } },
+        onClick: zipClickHandler(d.bottom_zips),
+        onHover: zipHoverHandler(el),
+      }
+    });
+  }
 }
 
 // ---------- REVENUE ----------
@@ -149,7 +172,7 @@ async function renderInspections() {
     tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No repeat low-score establishments.</td></tr>';
   } else {
     tbody.innerHTML = d.repeat_offenders.map(r => `
-      <tr>
+      <tr onclick="window.location='/establishment/${r.establishment_id}'">
         <td>${r.canonical_name}</td>
         <td>${r.city}</td>
         <td>${r.zip||''}</td>
@@ -159,6 +182,7 @@ async function renderInspections() {
         <td>${r.min_score ?? ''}</td>
       </tr>
     `).join('');
+    document.getElementById('repeatOffenders').classList.add('hover-table');
     makeSortable('repeatOffenders');
   }
 }
@@ -201,7 +225,8 @@ function drawCorrelation(minConf) {
     const y = Number(p.avg_monthly_receipts);
     if (y <= 0) continue;
     (byCity[p.city] = byCity[p.city] || []).push({
-      x: Number(p.avg_score), y, name: p.canonical_name, zip: p.zip
+      x: Number(p.avg_score), y,
+      name: p.canonical_name, zip: p.zip, id: p.establishment_id,
     });
   }
   const datasets = Object.entries(byCity).map(([city, pts]) => ({
@@ -229,18 +254,27 @@ function drawCorrelation(minConf) {
   }
 
   if (corrChart) corrChart.destroy();
-  corrChart = new Chart(document.getElementById('scatter'), {
+  const scatterEl = document.getElementById('scatter');
+  corrChart = new Chart(scatterEl, {
     type: 'scatter',
     data: { datasets },
     options: {
       maintainAspectRatio: false,
+      onHover: (evt, active) => {
+        scatterEl.style.cursor = active.length && active[0].element.$context.raw.id ? 'pointer' : 'default';
+      },
+      onClick: (evt, active) => {
+        if (!active.length) return;
+        const p = active[0].element.$context.raw;
+        if (p.id) window.location = '/establishment/' + p.id;
+      },
       plugins: {
         tooltip: {
           callbacks: {
             label: (ctx) => {
               const p = ctx.raw;
               if (!p.name) return '';
-              return `${p.name} (${p.zip || '—'}): ${p.x} pts, $${Math.round(p.y).toLocaleString()}/mo`;
+              return `${p.name} (${p.zip || '—'}): ${p.x} pts, $${Math.round(p.y).toLocaleString()}/mo · click to drill in`;
             }
           }
         }

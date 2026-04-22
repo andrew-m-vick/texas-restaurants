@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Browse Establishments</h1>
+<p class="muted">All 20,898 establishments across Austin and Dallas — filter, sort, and click any row to drill in.</p>
+
+<div class="card">
+  <div class="filters">
+    <input id="fName" type="text" placeholder="Name contains…" class="filter-input">
+    <input id="fZip"  type="text" placeholder="ZIP" class="filter-input" style="width:90px">
+    <select id="fMatch" class="hdr-select">
+      <option value="">Any match type</option>
+      <option value="fuzzy_zip_block">Fuzzy-matched</option>
+      <option value="mb_only">Mixed-beverage only</option>
+      <option value="inspection_only">Inspection only</option>
+    </select>
+    <input id="fMinScore" type="number" placeholder="Min score" class="filter-input" style="width:110px" min="0" max="100">
+    <input id="fMaxScore" type="number" placeholder="Max score" class="filter-input" style="width:110px" min="0" max="100">
+    <button id="fReset" class="btn-ghost">Reset</button>
+    <span id="resultCount" class="muted" style="margin-left:auto"></span>
+  </div>
+
+  <table id="estTable" class="hover-table">
+    <thead>
+      <tr>
+        <th data-sort="name">Name</th>
+        <th data-sort="city">City</th>
+        <th data-sort="zip">ZIP</th>
+        <th>Address</th>
+        <th data-sort="score" class="num">Avg Score</th>
+        <th data-sort="inspections" class="num">Inspections</th>
+        <th data-sort="revenue" class="num">$/mo (avg)</th>
+        <th data-sort="match">Match</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="pagination">
+    <button id="pgPrev" class="btn-ghost">‹ Prev</button>
+    <span id="pgInfo" class="muted"></span>
+    <button id="pgNext" class="btn-ghost">Next ›</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/establishments.js') }}"></script>
+<script>renderEstablishments();</script>
+{% endblock %}

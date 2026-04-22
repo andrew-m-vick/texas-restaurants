@@ -80,6 +80,11 @@ def ops():
     return _render("ops.html", "ops")
 
 
+@bp.route("/establishments")
+def establishments():
+    return _render("establishments.html", "establishments")
+
+
 @bp.route("/establishment/<int:est_id>")
 def establishment(est_id: int):
     return _render("establishment.html", "")
@@ -180,7 +185,8 @@ def api_inspections():
     )
     repeat = _fetch(
         f"""
-        SELECT city, canonical_name, zip, inspection_count, low_score_count, avg_score, min_score
+        SELECT establishment_id, city, canonical_name, zip,
+               inspection_count, low_score_count, avg_score, min_score
         FROM gold.repeat_offenders WHERE {_city_clause()}
         ORDER BY low_score_count DESC, avg_score ASC LIMIT 25
         """,
@@ -202,8 +208,8 @@ def api_correlation():
     c = _city()
     rows = _fetch(
         f"""
-        SELECT c.city, c.canonical_name, c.zip, c.avg_score, c.avg_monthly_receipts,
-               e.match_score
+        SELECT c.establishment_id, c.city, c.canonical_name, c.zip,
+               c.avg_score, c.avg_monthly_receipts, e.match_score
         FROM gold.score_revenue_correlation c
         JOIN silver.establishments e ON e.id = c.establishment_id
         WHERE c.avg_score IS NOT NULL AND c.avg_monthly_receipts IS NOT NULL
@@ -299,6 +305,101 @@ def api_establishment(est_id: int):
         city=h["city"], fids=h["facility_ids"] or [],
     )
     return jsonify(header=h, inspections=inspections, revenue=revenue, violations=violations)
+
+
+@bp.route("/api/establishments")
+def api_establishments():
+    c = _city()
+    q = (request.args.get("q") or "").strip()
+    zip_ = (request.args.get("zip") or "").strip()
+    match_method = (request.args.get("match") or "").strip()
+    min_score = request.args.get("min_score", type=float)
+    max_score = request.args.get("max_score", type=float)
+    sort = (request.args.get("sort") or "name").lower()
+    direction = "ASC" if request.args.get("dir", "asc").lower() == "asc" else "DESC"
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = 50
+
+    # These refer to columns on the outer `base` CTE, not silver.establishments.
+    allowed_sort = {
+        "name": "canonical_name",
+        "city": "city",
+        "zip": "zip",
+        "score": "avg_score",
+        "inspections": "inspection_count",
+        "revenue": "avg_monthly_receipts",
+        "match": "match_score",
+    }
+    sort_col = allowed_sort.get(sort, "canonical_name")
+    # Null-safe sorting: always push nulls to the end
+    nulls = "NULLS LAST" if direction == "DESC" else "NULLS LAST"
+
+    filters = [f"{_city_clause('e.city')}"]
+    params = {"city": c}
+    if q:
+        filters.append("upper(e.canonical_name) LIKE :q")
+        params["q"] = f"%{q.upper()}%"
+    if zip_:
+        filters.append("e.zip = :zip")
+        params["zip"] = zip_
+    if match_method:
+        filters.append("e.match_method = :mm")
+        params["mm"] = match_method
+
+    score_filters = []
+    if min_score is not None:
+        score_filters.append("avg_score >= :min_score")
+        params["min_score"] = min_score
+    if max_score is not None:
+        score_filters.append("avg_score <= :max_score")
+        params["max_score"] = max_score
+
+    where_sql = " AND ".join(filters) if filters else "TRUE"
+    outer_where = ("WHERE " + " AND ".join(score_filters)) if score_filters else ""
+    offset = (page - 1) * per_page
+
+    rows = _fetch(
+        f"""
+        WITH base AS (
+          SELECT
+            e.id, e.canonical_name, e.canonical_address, e.city, e.zip,
+            e.match_method, e.match_score,
+            (SELECT count(*) FROM silver.inspections i
+               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids)) AS inspection_count,
+            (SELECT avg(score)::numeric(5,2) FROM silver.inspections i
+               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids)) AS avg_score,
+            (SELECT avg(mb.total_receipts)::numeric(14,2) FROM silver.mixed_beverage mb
+               WHERE mb.city = e.city
+                 AND mb.taxpayer_number = e.mb_taxpayer_number
+                 AND mb.location_number = e.mb_location_number) AS avg_monthly_receipts
+          FROM silver.establishments e
+          WHERE {where_sql}
+        )
+        SELECT * FROM base
+        {outer_where}
+        ORDER BY {sort_col} {direction} {nulls}, id
+        LIMIT :limit OFFSET :offset
+        """,
+        limit=per_page, offset=offset, **params,
+    )
+
+    total = _fetch(
+        f"""
+        WITH base AS (
+          SELECT e.id,
+            (SELECT avg(score) FROM silver.inspections i
+               WHERE i.city = e.city AND i.facility_id = ANY(e.facility_ids)) AS avg_score
+          FROM silver.establishments e
+          WHERE {where_sql}
+        )
+        SELECT count(*) AS n FROM base {outer_where}
+        """,
+        **params,
+    )
+    return jsonify(
+        rows=rows, total=total[0]["n"] if total else 0,
+        page=page, per_page=per_page,
+    )
 
 
 @bp.route("/api/zip/<zip_code>")
