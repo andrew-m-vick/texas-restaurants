@@ -280,7 +280,7 @@ function drawCorrelation(minConf) {
         }
       },
       scales: {
-        x: { min: 60, max: 100, title: { display: true, text: 'Avg inspection score' } },
+        x: { min: 70, max: 100, title: { display: true, text: 'Avg inspection score' } },
         y: {
           type: 'logarithmic',
           title: { display: true, text: 'Avg monthly receipts ($, log scale)' },
