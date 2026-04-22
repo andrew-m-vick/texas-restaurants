@@ -19,6 +19,9 @@ TX_MIXED_BEVERAGE_URL = os.getenv(
 AUSTIN_INSPECTIONS_URL = os.getenv(
     "AUSTIN_INSPECTIONS_URL", "https://data.austintexas.gov/resource/ecmv-9xxi.json"
 )
+TABC_LICENSES_URL = os.getenv(
+    "TABC_LICENSES_URL", "https://data.texas.gov/resource/7hf9-qc9f.json"
+)
 
 SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN", "")
 TARGET_CITIES = [

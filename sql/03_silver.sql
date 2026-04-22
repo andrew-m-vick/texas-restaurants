@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS silver.violations;
 DROP TABLE IF EXISTS silver.establishments;
 DROP TABLE IF EXISTS silver.inspections;
 DROP TABLE IF EXISTS silver.mixed_beverage;
+DROP TABLE IF EXISTS silver.licenses;
 
 CREATE TABLE silver.mixed_beverage (
     id BIGSERIAL PRIMARY KEY,
@@ -64,3 +65,41 @@ CREATE TABLE silver.establishments (
 );
 
 CREATE INDEX idx_silver_est_zip ON silver.establishments (zip);
+
+CREATE TABLE silver.licenses (
+    id BIGSERIAL PRIMARY KEY,
+    city TEXT NOT NULL,
+    master_file_id TEXT,
+    license_id TEXT NOT NULL,
+    license_type TEXT,
+    tier TEXT,
+    primary_status TEXT,
+    trade_name TEXT,
+    owner TEXT,
+    address TEXT,
+    zip TEXT,
+    original_issue_date DATE,
+    current_issued_date DATE,
+    expiration_date DATE,
+    status_change_date DATE,
+    gun_sign TEXT,
+    name_key TEXT,
+    address_key TEXT,
+    UNIQUE (license_id)
+);
+
+CREATE INDEX idx_silver_lic_keys ON silver.licenses (name_key, address_key);
+CREATE INDEX idx_silver_lic_zip ON silver.licenses (zip);
+CREATE INDEX idx_silver_lic_master ON silver.licenses (master_file_id);
+
+-- Join table: which TABC licenses belong to which matched establishment.
+-- Populated by match_establishments.py so licenses and establishments stay
+-- loosely coupled (a single establishment can hold several license rows).
+CREATE TABLE silver.establishment_licenses (
+    establishment_id BIGINT NOT NULL,
+    license_id TEXT NOT NULL,
+    match_score NUMERIC(5,2),
+    PRIMARY KEY (establishment_id, license_id)
+);
+
+CREATE INDEX idx_silver_el_license ON silver.establishment_licenses (license_id);

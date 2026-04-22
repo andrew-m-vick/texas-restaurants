@@ -66,11 +66,16 @@ jobs:
       - name: Ingest Austin inspections
         run: python -m pipeline.bronze.austin_inspections
 
+      - name: Ingest TABC licenses (Retail)
+        run: python -m pipeline.bronze.tabc_licenses
+
       - name: Rebuild silver layer
         run: |
           python -m pipeline.silver.clean_mixed_beverage
           python -m pipeline.silver.clean_inspections
+          python -m pipeline.silver.clean_licenses
           python -m pipeline.silver.match_establishments
+          python -m pipeline.silver.match_licenses
 
       - name: Rebuild gold layer
         run: python -m pipeline.gold.aggregates

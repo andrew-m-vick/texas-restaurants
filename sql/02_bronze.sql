@@ -49,3 +49,31 @@ CREATE TABLE IF NOT EXISTS bronze.inspections (
 
 CREATE INDEX IF NOT EXISTS idx_bronze_insp_city ON bronze.inspections (city);
 CREATE INDEX IF NOT EXISTS idx_bronze_insp_facility ON bronze.inspections (facility_id);
+
+-- TABC license ingest target. Retail tier only (the slice that overlaps
+-- with restaurants/bars and MB receipts). Dates come in as ISO strings.
+CREATE TABLE IF NOT EXISTS bronze.licenses (
+    master_file_id TEXT,
+    license_id TEXT,
+    license_type TEXT,
+    tier TEXT,
+    primary_status TEXT,
+    license_status TEXT,
+    trade_name TEXT,
+    owner TEXT,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    zip TEXT,
+    county TEXT,
+    original_issue_date TEXT,
+    current_issued_date TEXT,
+    expiration_date TEXT,
+    status_change_date TEXT,
+    gun_sign TEXT,
+    raw JSONB,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bronze_lic_city ON bronze.licenses (city);
+CREATE INDEX IF NOT EXISTS idx_bronze_lic_master ON bronze.licenses (master_file_id);

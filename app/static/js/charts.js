@@ -265,6 +265,115 @@ function drawCorrelation(minConf) {
       : '');
 }
 
+// ---------- LIFECYCLE ----------
+async function renderLifecycle() {
+  const d = await (await fetch('/static/data/lifecycle.json')).json();
+
+  new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: d.status.map(r => r.status || '—'),
+      datasets: [{ data: d.status.map(r => r.n), backgroundColor: palette }],
+    },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+  });
+
+  new Chart(document.getElementById('gunSignChart'), {
+    type: 'doughnut',
+    data: {
+      labels: d.gun_sign.map(r => r.gun_sign),
+      datasets: [{ data: d.gun_sign.map(r => r.n), backgroundColor: palette }],
+    },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+  });
+
+  const points = d.tenure_vs_score.map(r => ({
+    x: Number(r.tenure_years),
+    y: Number(r.avg_score),
+    name: r.canonical_name,
+    zip: r.zip,
+    id: r.establishment_id,
+    n: r.inspection_count,
+  })).filter(p => p.y > 0 && p.x >= 0);
+
+  const { m, b, r } = linreg(points);
+  const scatterEl = document.getElementById('tenureScatter');
+  const xs = points.map(p => p.x);
+  const minX = Math.min(...xs, 0), maxX = Math.max(...xs, 1);
+
+  new Chart(scatterEl, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: `Establishments (n=${points.length})`,
+          data: points,
+          backgroundColor: '#4cc9f0aa',
+          pointRadius: 3,
+        },
+        {
+          label: 'Regression',
+          type: 'line',
+          data: [{ x: minX, y: m * minX + b }, { x: maxX, y: m * maxX + b }],
+          borderColor: '#f9844a',
+          backgroundColor: 'transparent',
+          pointRadius: 0, borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      maintainAspectRatio: false,
+      onHover: (evt, active) => {
+        scatterEl.style.cursor = active.length && active[0].element.$context.raw.id ? 'pointer' : 'default';
+      },
+      onClick: (evt, active) => {
+        if (!active.length) return;
+        const p = active[0].element.$context.raw;
+        if (p.id) window.location = '/establishment/' + p.id;
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const p = ctx.raw;
+              if (!p.name) return '';
+              return `${p.name} (${p.zip || '—'}): ${p.x} yrs, ${p.y.toFixed(1)} pts · click to drill in`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Years since earliest TABC permit' } },
+        y: { suggestedMin: 70, suggestedMax: 100, title: { display: true, text: 'Avg inspection score' } },
+      }
+    }
+  });
+
+  document.getElementById('tenureStat').innerHTML =
+    `Pearson r = <b>${r.toFixed(3)}</b> · slope = ${m.toFixed(3)} pts/year. ` +
+    (Math.abs(r) < 0.1
+      ? `<span class="muted">Weak signal: tenure barely moves inspection score.</span>`
+      : (r > 0
+          ? `<span class="muted">Older establishments score modestly higher.</span>`
+          : `<span class="muted">Older establishments score modestly lower.</span>`));
+
+  const rows = d.status_by_zip.map(z => ({
+    ...z,
+    pct_expired: z.total ? ((Number(z.expired) / Number(z.total)) * 100).toFixed(1) : '0.0',
+  }));
+  document.querySelector('#statusByZip tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.zip}</td>
+      <td class="num">${r.total}</td>
+      <td class="num">${r.active}</td>
+      <td class="num">${r.expired}</td>
+      <td class="num">${r.cancelled}</td>
+      <td class="num">${r.pct_expired}%</td>
+    </tr>
+  `).join('');
+  makeSortable('statusByZip');
+}
+
 // ---------- OPS ----------
 async function renderOps() {
   const d = await (await fetch('/static/data/ops.json')).json();

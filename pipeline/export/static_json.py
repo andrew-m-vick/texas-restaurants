@@ -306,7 +306,23 @@ def build_establishment_detail(conn, row: dict) -> dict:
         WHERE city = :city AND taxpayer_number = :tp AND location_number = :ln
         ORDER BY obligation_end_date
     """, city=row["city"], tp=row["mb_taxpayer_number"], ln=row["mb_location_number"])
-    return {"header": row, "inspections": inspections, "revenue": revenue, "violations": []}
+    licenses = _rows(conn, """
+        SELECT l.license_id, l.license_type, l.tier, l.primary_status,
+               l.original_issue_date, l.current_issued_date,
+               l.expiration_date, l.status_change_date, l.gun_sign,
+               l.master_file_id, l.owner
+        FROM silver.establishment_licenses el
+        JOIN silver.licenses l ON l.license_id = el.license_id
+        WHERE el.establishment_id = :eid
+        ORDER BY l.original_issue_date
+    """, eid=row["id"])
+    return {
+        "header": row,
+        "inspections": inspections,
+        "revenue": revenue,
+        "violations": [],
+        "licenses": licenses,
+    }
 
 
 def build_ops(conn) -> dict:
@@ -317,13 +333,80 @@ def build_ops(conn) -> dict:
     counts = _rows(conn, """
         SELECT 'bronze.mixed_beverage' AS tbl, count(*) AS n FROM bronze.mixed_beverage
         UNION ALL SELECT 'bronze.inspections', count(*) FROM bronze.inspections
+        UNION ALL SELECT 'bronze.licenses', count(*) FROM bronze.licenses
         UNION ALL SELECT 'silver.mixed_beverage', count(*) FROM silver.mixed_beverage
         UNION ALL SELECT 'silver.inspections', count(*) FROM silver.inspections
         UNION ALL SELECT 'silver.establishments', count(*) FROM silver.establishments
+        UNION ALL SELECT 'silver.licenses', count(*) FROM silver.licenses
+        UNION ALL SELECT 'silver.establishment_licenses', count(*) FROM silver.establishment_licenses
         UNION ALL SELECT 'gold.revenue_by_zip_month', count(*) FROM gold.revenue_by_zip_month
         UNION ALL SELECT 'gold.score_revenue_correlation', count(*) FROM gold.score_revenue_correlation
     """)
     return {"runs": runs, "counts": counts}
+
+
+def build_lifecycle(conn) -> dict:
+    """Permit lifecycle aggregates: status distribution, tenure x score points,
+    gun-sign breakdown. Window-independent — licenses reflect current state."""
+    status = _rows(conn, """
+        SELECT primary_status AS status, count(*) AS n
+        FROM silver.licenses
+        GROUP BY primary_status ORDER BY n DESC
+    """)
+    tier = _rows(conn, """
+        SELECT COALESCE(gun_sign, 'UNKNOWN') AS gun_sign, count(*) AS n
+        FROM silver.licenses
+        GROUP BY gun_sign ORDER BY n DESC
+    """)
+    # One point per establishment: tenure (years since earliest license
+    # original_issue_date) vs avg inspection score. Powers the
+    # "does tenure predict cleanliness?" scatter.
+    tenure_vs_score = _rows(conn, """
+        WITH est_tenure AS (
+          SELECT e.id AS establishment_id, e.canonical_name, e.city, e.zip,
+                 min(l.original_issue_date) AS first_issued
+          FROM silver.establishments e
+          JOIN silver.establishment_licenses el ON el.establishment_id = e.id
+          JOIN silver.licenses l ON l.license_id = el.license_id
+          WHERE l.original_issue_date IS NOT NULL
+          GROUP BY e.id, e.canonical_name, e.city, e.zip
+        ),
+        est_score AS (
+          SELECT e.id, avg(i.score) AS avg_score, count(i.id) AS n
+          FROM silver.establishments e
+          JOIN silver.inspections i
+            ON i.city = e.city AND i.facility_id = ANY(e.facility_ids)
+          GROUP BY e.id
+        )
+        SELECT t.establishment_id, t.canonical_name, t.zip,
+               t.first_issued,
+               extract(year from age(current_date, t.first_issued))::int AS tenure_years,
+               s.avg_score::numeric(5,2) AS avg_score,
+               s.n AS inspection_count
+        FROM est_tenure t
+        JOIN est_score s ON s.id = t.establishment_id
+        WHERE s.avg_score IS NOT NULL AND s.n >= 2
+    """)
+    # Most-expired / most-active ZIPs — churn proxy.
+    status_by_zip = _rows(conn, """
+        SELECT zip,
+               count(*) AS total,
+               count(*) FILTER (WHERE primary_status ILIKE 'Active%%') AS active,
+               count(*) FILTER (WHERE primary_status ILIKE 'Expired%%') AS expired,
+               count(*) FILTER (WHERE primary_status ILIKE 'Cancel%%'
+                             OR primary_status ILIKE 'Inactive%%') AS cancelled
+        FROM silver.licenses
+        WHERE zip IS NOT NULL
+        GROUP BY zip
+        HAVING count(*) >= 5
+        ORDER BY total DESC
+    """)
+    return {
+        "status": status,
+        "gun_sign": tier,
+        "tenure_vs_score": tenure_vs_score,
+        "status_by_zip": status_by_zip,
+    }
 
 
 # ---------- orchestration ----------
@@ -343,6 +426,7 @@ def run():
 
         _write(OUT_DIR / "search.json", {"results": build_search_index(conn)}); files += 1
         _write(OUT_DIR / "ops.json", build_ops(conn)); files += 1
+        _write(OUT_DIR / "lifecycle.json", build_lifecycle(conn)); files += 1
 
         # Per-establishment detail
         est_rows = _rows(conn, """

@@ -6,6 +6,19 @@
   <div class="card"><h2>Inspection History</h2><canvas id="estScores"></canvas></div>
   <div class="card"><h2>Monthly Receipts</h2><canvas id="estRevenue"></canvas></div>
 </div>
+<div class="card" id="licensesCard" style="display:none">
+  <h2>TABC Licenses</h2>
+  <table id="estLicenses">
+    <thead>
+      <tr>
+        <th>License</th><th>Type</th><th>Status</th><th>Original issue</th>
+        <th>Current issued</th><th>Expiration</th><th>Gun sign</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p class="muted" id="estTenure" style="margin-top:0.75rem"></p>
+</div>
 <div class="card" id="violationsCard" style="display:none">
   <h2>Violations</h2>
   <table id="estViolations">
@@ -68,6 +81,31 @@
       scales: { x: { stacked: true }, y: { stacked: true } }
     }
   });
+
+  if (d.licenses && d.licenses.length) {
+    document.getElementById('licensesCard').style.display = '';
+    const tbody = document.querySelector('#estLicenses tbody');
+    tbody.innerHTML = d.licenses.map(l => `
+      <tr>
+        <td>${l.license_id}</td>
+        <td>${l.license_type || ''}</td>
+        <td>${l.primary_status || ''}</td>
+        <td>${l.original_issue_date || ''}</td>
+        <td>${l.current_issued_date || ''}</td>
+        <td>${l.expiration_date || ''}</td>
+        <td>${l.gun_sign || ''}</td>
+      </tr>
+    `).join('');
+    const earliest = d.licenses
+      .map(l => l.original_issue_date)
+      .filter(Boolean)
+      .sort()[0];
+    if (earliest) {
+      const years = ((new Date() - new Date(earliest)) / (365.25 * 24 * 3600 * 1000)).toFixed(1);
+      document.getElementById('estTenure').textContent =
+        `Earliest permit: ${earliest} · tenure: ${years} years`;
+    }
+  }
 
   if (d.violations && d.violations.length) {
     document.getElementById('violationsCard').style.display = '';

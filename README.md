@@ -1,6 +1,6 @@
 # Austin Restaurant Industry Analytics
 
-End-to-end data pipeline and analytics dashboard joining two public Texas datasets that nobody joins: **state mixed beverage gross receipts** (who sells liquor, and how much) and **City of Austin food service inspections** (how clean those kitchens actually are).
+End-to-end data pipeline and analytics dashboard joining three public Texas datasets that nobody joins: **state mixed beverage gross receipts** (who sells liquor, and how much), **City of Austin food service inspections** (how clean those kitchens actually are), and **TABC license records** (when each bar/restaurant first got permitted and whether it's still active).
 
 Built around a medallion (bronze → silver → gold) warehouse in PostgreSQL, orchestrated by Airflow (with a GitHub Actions mirror for hosted refresh), served through a Flask + Chart.js + Leaflet dashboard.
 
@@ -40,6 +40,7 @@ This is a genuine null result, and I think that's more interesting than a contri
 
 - [Texas Open Data Portal — Mixed Beverage Gross Receipts](https://data.texas.gov/dataset/Mixed-Beverage-Gross-Receipts/naix-2893) — statewide, monthly; filtered to Austin
 - [City of Austin — Food Establishment Inspection Scores](https://data.austintexas.gov/Health-and-Community-Services/Food-Establishment-Inspection-Scores/ecmv-9xxi) — rolling 3-year window, live
+- [Texas Open Data Portal — TABC License Information](https://data.texas.gov/resource/7hf9-qc9f) — statewide, refreshed continuously; filtered to Austin Retail tier
 
 ## Architecture
 
@@ -137,6 +138,7 @@ Seven views:
 | Inspections | Score distribution (A/B/C/D), repeat low-score establishments (sortable) |
 | Correlation | Log-y scatter with regression line + Pearson *r*, **match-confidence slider** to filter by provenance |
 | Map | Leaflet ZIP-level circle map with side panel — click any ZIP to list its establishments and drill into individual records |
+| Lifecycle | TABC permit-status distribution, gun-sign classification, **tenure vs. inspection score** scatter, ZIP-level permit churn |
 | Browse | Sortable/filterable table of all 8,630 establishments |
 | Pipeline | Live OPS tab: row counts by layer, recent DAG runs with status |
 | `/establishment/<id>` | Per-restaurant detail: inspection history line chart, stacked monthly receipts (liquor/wine/beer) |
@@ -157,9 +159,12 @@ cp .env.example .env
 # 3. Run the full pipeline once
 python -m pipeline.bronze.mixed_beverage
 python -m pipeline.bronze.austin_inspections
+python -m pipeline.bronze.tabc_licenses
 python -m pipeline.silver.clean_mixed_beverage
 python -m pipeline.silver.clean_inspections
+python -m pipeline.silver.clean_licenses
 python -m pipeline.silver.match_establishments
+python -m pipeline.silver.match_licenses
 python -m pipeline.gold.aggregates
 python -m pipeline.export.static_json   # bakes /static/data/*.json
 
@@ -185,6 +190,7 @@ airflow standalone
 | --- | --- | --- |
 | `ingest_mixed_beverage` | `@monthly` | → `build_silver_layer` |
 | `ingest_inspections` | `@weekly` | → `build_silver_layer` |
+| `ingest_tabc_licenses` | `@monthly` | → `build_silver_layer` |
 | `build_silver_layer` | manual/trigger | → `build_gold_layer` |
 | `build_gold_layer` | manual/trigger | `build_aggregates` → `export_static_json` |
 
