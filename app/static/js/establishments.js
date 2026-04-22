@@ -84,7 +84,6 @@ function renderEstablishments() {
 async function load() {
   const s = ESTState.read();
   const qs = new URLSearchParams();
-  if (window.SELECTED_CITY && window.SELECTED_CITY !== 'ALL') qs.set('city', window.SELECTED_CITY);
   if (window.SELECTED_WINDOW && window.SELECTED_WINDOW !== '5y') qs.set('window', window.SELECTED_WINDOW);
   for (const k of ['q','zip','match','min_score','max_score','sort','dir','page']) {
     if (s[k] !== '' && s[k] != null && s[k] !== 1) qs.set(k, s[k]);

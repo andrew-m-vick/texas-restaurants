@@ -1,4 +1,4 @@
--- Silver: cleaned, typed, deduped — city-dimensioned.
+-- Silver: cleaned, typed, deduped.
 
 DROP TABLE IF EXISTS silver.violations;
 DROP TABLE IF EXISTS silver.establishments;
@@ -24,9 +24,8 @@ CREATE TABLE silver.mixed_beverage (
     UNIQUE (taxpayer_number, location_number, obligation_end_date)
 );
 
-CREATE INDEX idx_silver_mb_city ON silver.mixed_beverage (city);
-CREATE INDEX idx_silver_mb_keys ON silver.mixed_beverage (city, name_key, address_key);
-CREATE INDEX idx_silver_mb_zip_date ON silver.mixed_beverage (city, location_zip, obligation_end_date);
+CREATE INDEX idx_silver_mb_keys ON silver.mixed_beverage (name_key, address_key);
+CREATE INDEX idx_silver_mb_zip_date ON silver.mixed_beverage (location_zip, obligation_end_date);
 
 CREATE TABLE silver.inspections (
     id BIGSERIAL PRIMARY KEY,
@@ -42,29 +41,13 @@ CREATE TABLE silver.inspections (
     longitude NUMERIC(9,6),
     name_key TEXT,
     address_key TEXT,
-    UNIQUE (city, facility_id, inspection_date, inspection_type)
+    UNIQUE (facility_id, inspection_date, inspection_type)
 );
 
-CREATE INDEX idx_silver_insp_city ON silver.inspections (city);
-CREATE INDEX idx_silver_insp_keys ON silver.inspections (city, name_key, address_key);
-CREATE INDEX idx_silver_insp_zip_date ON silver.inspections (city, zip, inspection_date);
-CREATE INDEX idx_silver_insp_facility ON silver.inspections (city, facility_id);
+CREATE INDEX idx_silver_insp_keys ON silver.inspections (name_key, address_key);
+CREATE INDEX idx_silver_insp_zip_date ON silver.inspections (zip, inspection_date);
+CREATE INDEX idx_silver_insp_facility ON silver.inspections (facility_id);
 
--- Only Dallas publishes violation detail. One row per violation.
-CREATE TABLE silver.violations (
-    id BIGSERIAL PRIMARY KEY,
-    city TEXT NOT NULL,
-    facility_id TEXT NOT NULL,
-    inspection_date DATE,
-    description TEXT,
-    points NUMERIC(5,2),
-    memo TEXT
-);
-
-CREATE INDEX idx_silver_viol_facility ON silver.violations (city, facility_id);
-CREATE INDEX idx_silver_viol_date ON silver.violations (city, inspection_date);
-
--- Unified establishment identity, one row per matched/partial-matched entity.
 CREATE TABLE silver.establishments (
     id BIGSERIAL PRIMARY KEY,
     city TEXT NOT NULL,
@@ -80,4 +63,4 @@ CREATE TABLE silver.establishments (
     match_method TEXT
 );
 
-CREATE INDEX idx_silver_est_city_zip ON silver.establishments (city, zip);
+CREATE INDEX idx_silver_est_zip ON silver.establishments (zip);

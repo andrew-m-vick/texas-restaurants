@@ -7,7 +7,6 @@ _raw_db_url = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg2://postgres:postgres@localhost:5432/austin_restaurants",
 )
-# Railway/Heroku style: normalize bare "postgresql://" to force the psycopg2 driver.
 if _raw_db_url.startswith("postgresql://"):
     _raw_db_url = "postgresql+psycopg2://" + _raw_db_url[len("postgresql://"):]
 elif _raw_db_url.startswith("postgres://"):
@@ -20,14 +19,11 @@ TX_MIXED_BEVERAGE_URL = os.getenv(
 AUSTIN_INSPECTIONS_URL = os.getenv(
     "AUSTIN_INSPECTIONS_URL", "https://data.austintexas.gov/resource/ecmv-9xxi.json"
 )
-DALLAS_INSPECTIONS_URL = os.getenv(
-    "DALLAS_INSPECTIONS_URL", "https://www.dallasopendata.com/resource/dri5-wcct.json"
-)
 
 SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN", "")
 TARGET_CITIES = [
     c.strip().upper()
-    for c in os.getenv("TARGET_CITIES", "AUSTIN,DALLAS").split(",")
+    for c in os.getenv("TARGET_CITIES", "AUSTIN").split(",")
     if c.strip()
 ]
 

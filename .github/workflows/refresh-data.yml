@@ -1,18 +1,12 @@
 name: Refresh data
 
 # Refreshes the Railway Postgres against live sources:
-#   - Texas Mixed Beverage receipts (both Austin + Dallas)
+#   - Texas Mixed Beverage receipts (filtered to Austin)
 #   - Austin inspections (live Socrata feed)
-# Dallas inspections dataset is sunset (2024) so we don't re-ingest it;
-# the Dallas bronze data stays as loaded, and silver/gold still pick it up
-# on rebuild because clean_inspections/clean_violations read the whole
-# bronze table.
 
 on:
   schedule:
-    # 1st of each month at 07:00 UTC. TX Mixed Beverage releases monthly;
-    # Austin inspections update weekly but drift is fine at this resolution.
-    # Dallas is sunset (Jan 2024) so it doesn't need refreshing at all.
+    # 1st of each month at 07:00 UTC. TX Mixed Beverage releases monthly.
     - cron: '0 7 1 * *'
   workflow_dispatch:  # manual trigger from the Actions tab
 
@@ -27,11 +21,10 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
-      TARGET_CITIES: AUSTIN,DALLAS
+      TARGET_CITIES: AUSTIN
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -42,7 +35,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Ingest Texas Mixed Beverage (Austin + Dallas)
+      - name: Ingest Texas Mixed Beverage (Austin)
         run: python -m pipeline.bronze.mixed_beverage
 
       - name: Ingest Austin inspections
@@ -52,7 +45,6 @@ jobs:
         run: |
           python -m pipeline.silver.clean_mixed_beverage
           python -m pipeline.silver.clean_inspections
-          python -m pipeline.silver.clean_violations
           python -m pipeline.silver.match_establishments
 
       - name: Rebuild gold layer

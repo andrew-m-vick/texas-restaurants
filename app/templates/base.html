@@ -22,12 +22,6 @@
           <input id="searchInput" type="text" placeholder="Search restaurants..." autocomplete="off">
           <div id="searchResults" class="search-results"></div>
         </div>
-        <select id="citySelect" class="hdr-select" title="City">
-          <option value="ALL" {% if selected_city == 'ALL' %}selected{% endif %}>All cities</option>
-          {% for c in cities %}
-            <option value="{{ c }}" {% if selected_city == c %}selected{% endif %}>{{ c.title() }}</option>
-          {% endfor %}
-        </select>
         <select id="windowSelect" class="hdr-select" title="Time window">
           {% for key, (label, _) in windows.items() %}
             <option value="{{ key }}" {% if selected_window == key %}selected{% endif %}>{{ label }}</option>
@@ -47,7 +41,6 @@
       ] %}
       {% for key, label in tabs %}
         {% set qs = [] %}
-        {% if selected_city != 'ALL' %}{% set _ = qs.append('city=' + selected_city) %}{% endif %}
         {% if selected_window != '5y' %}{% set _ = qs.append('window=' + selected_window) %}{% endif %}
         <a href="{{ url_for('main.' + ('map_view' if key=='map' else key)) }}{% if qs %}?{{ qs|join('&') }}{% endif %}"
            class="{{ 'active' if active==key else '' }}">{{ label }}</a>
@@ -58,14 +51,8 @@
     {% block content %}{% endblock %}
   </main>
   <script>
-    window.SELECTED_CITY = {{ selected_city|tojson }};
+    window.SELECTED_CITY = 'AUSTIN';
     window.SELECTED_WINDOW = {{ selected_window|tojson }};
-    document.getElementById('citySelect').addEventListener('change', (e) => {
-      const url = new URL(window.location.href);
-      if (e.target.value === 'ALL') url.searchParams.delete('city');
-      else url.searchParams.set('city', e.target.value);
-      window.location.href = url.toString();
-    });
     document.getElementById('windowSelect').addEventListener('change', (e) => {
       const url = new URL(window.location.href);
       if (e.target.value === '5y') url.searchParams.delete('window');

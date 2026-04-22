@@ -8,7 +8,6 @@ Chart.defaults.borderColor = '#262b36';
 
 function cityParam(extra = '') {
   const qs = new URLSearchParams();
-  if (window.SELECTED_CITY && window.SELECTED_CITY !== 'ALL') qs.set('city', window.SELECTED_CITY);
   if (window.SELECTED_WINDOW && window.SELECTED_WINDOW !== '5y') qs.set('window', window.SELECTED_WINDOW);
   if (extra) extra.split('&').filter(Boolean).forEach(pair => {
     const [k, v] = pair.split('='); qs.set(k, v);
@@ -29,37 +28,17 @@ async function renderOverview() {
   const d = await fetchJSON('/api/overview');
   clearLoading('kpis', 'topZips', 'bottomZips');
   const k = d.kpis || {};
-  const selected = window.SELECTED_CITY;
-
-  // Side-by-side KPIs when city=All, single when a city is selected.
-  const kpiHost = document.getElementById('kpis');
-  if (selected === 'ALL' && d.by_city && d.by_city.length > 1) {
-    kpiHost.classList.add('kpis-grid-multi');
-    kpiHost.innerHTML = d.by_city.map(c => `
-      <div class="kpi-group" style="border-top: 3px solid ${cityColor[c.city] || '#888'}">
-        <div class="kpi-group-city">${c.city}</div>
-        <div class="kpi-mini">
-          <div><span class="label">Establishments</span><span class="value">${fmtN(c.establishments)}</span></div>
-          <div><span class="label">Avg Score</span><span class="value">${c.avg_score ?? '—'}</span></div>
-          <div><span class="label">Total Revenue</span><span class="value">${fmt$(c.total_receipts)}</span></div>
-          <div><span class="label">Inspections</span><span class="value">${fmtN(c.inspections)}</span></div>
-        </div>
-      </div>
-    `).join('');
-  } else {
-    kpiHost.classList.remove('kpis-grid-multi');
-    kpiHost.innerHTML = `
-      <div class="kpi"><div class="label">Establishments</div><div class="value">${fmtN(k.establishments)}</div></div>
-      <div class="kpi"><div class="label">Avg Inspection Score</div><div class="value">${k.avg_score ?? '—'}</div></div>
-      <div class="kpi"><div class="label">Total Reported Revenue</div><div class="value">${fmt$(k.total_receipts)}</div></div>
-      <div class="kpi"><div class="label">Inspections Recorded</div><div class="value">${fmtN(k.inspections)}</div></div>
-    `;
-  }
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="label">Establishments</div><div class="value">${fmtN(k.establishments)}</div></div>
+    <div class="kpi"><div class="label">Avg Inspection Score</div><div class="value">${k.avg_score ?? '—'}</div></div>
+    <div class="kpi"><div class="label">Total Reported Revenue</div><div class="value">${fmt$(k.total_receipts)}</div></div>
+    <div class="kpi"><div class="label">Inspections Recorded</div><div class="value">${fmtN(k.inspections)}</div></div>
+  `;
 
   const zipClickHandler = (rows) => (evt, active) => {
     if (!active.length) return;
     const r = rows[active[0].index];
-    window.location = `/establishments?zip=${r.zip}&city=${r.city}`;
+    window.location = `/establishments?zip=${r.zip}`;
   };
   const zipHoverHandler = (canvas) => (evt, active) => {
     canvas.style.cursor = active.length ? 'pointer' : 'default';
@@ -153,28 +132,13 @@ async function renderInspections() {
     options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
   });
 
-  if (!d.top_violations.length) {
-    replaceWithEmpty('topViolations',
-      window.SELECTED_CITY === 'AUSTIN'
-        ? 'Austin publishes only overall scores, not violation detail.'
-        : 'No violation data for this selection.');
-  } else new Chart(document.getElementById('topViolations'), {
-    type: 'bar',
-    data: {
-      labels: d.top_violations.map(r => (r.description || '').slice(0, 50)),
-      datasets: [{ label: 'Occurrences', data: d.top_violations.map(r => r.occurrences), backgroundColor: palette[1] }]
-    },
-    options: { maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
-  });
-
   const tbody = document.querySelector('#repeatOffenders tbody');
   if (!d.repeat_offenders.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No repeat low-score establishments.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">No repeat low-score establishments.</td></tr>';
   } else {
     tbody.innerHTML = d.repeat_offenders.map(r => `
       <tr onclick="window.location='/establishment/${r.establishment_id}'">
         <td>${r.canonical_name}</td>
-        <td>${r.city}</td>
         <td>${r.zip||''}</td>
         <td>${r.inspection_count}</td>
         <td>${r.low_score_count}</td>

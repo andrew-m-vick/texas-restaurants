@@ -52,21 +52,7 @@ SQL_STATEMENTS = [
     FROM buckets b JOIN totals t USING (city)
     GROUP BY b.city, b.score_bucket, t.n;
     """,
-    # top_violations (Dallas only, but query is city-scoped so Austin just returns 0 rows)
-    """
-    TRUNCATE gold.top_violations;
-    INSERT INTO gold.top_violations
-    SELECT
-        city,
-        description,
-        count(*) AS occurrences,
-        count(DISTINCT facility_id) AS distinct_establishments,
-        sum(coalesce(points, 0))::numeric(10,2) AS total_points
-    FROM silver.violations
-    GROUP BY city, description
-    ORDER BY occurrences DESC;
-    """,
-    # repeat_offenders — score-based (works for both cities)
+    # repeat_offenders — score-based
     """
     TRUNCATE gold.repeat_offenders;
     INSERT INTO gold.repeat_offenders

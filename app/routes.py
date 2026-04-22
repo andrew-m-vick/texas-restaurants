@@ -305,18 +305,7 @@ def api_inspections():
         """,
         city=c, **w_params,
     )
-    top_viol = _fetch(
-        f"""
-        SELECT city, description, count(*) AS occurrences,
-               count(DISTINCT facility_id) AS distinct_establishments
-        FROM silver.violations
-        WHERE {_city_clause()} {w_sql}
-        GROUP BY city, description
-        ORDER BY occurrences DESC LIMIT 15
-        """,
-        city=c, **w_params,
-    )
-    return jsonify(distribution=dist, repeat_offenders=repeat, top_violations=top_viol)
+    return jsonify(distribution=dist, repeat_offenders=repeat)
 
 
 @bp.route("/api/correlation")
@@ -608,13 +597,10 @@ def api_ops():
     counts = _fetch("""
         SELECT 'bronze.mixed_beverage' AS tbl, count(*) AS n FROM bronze.mixed_beverage
         UNION ALL SELECT 'bronze.inspections', count(*) FROM bronze.inspections
-        UNION ALL SELECT 'bronze.dallas_violations', count(*) FROM bronze.dallas_violations
         UNION ALL SELECT 'silver.mixed_beverage', count(*) FROM silver.mixed_beverage
         UNION ALL SELECT 'silver.inspections', count(*) FROM silver.inspections
-        UNION ALL SELECT 'silver.violations', count(*) FROM silver.violations
         UNION ALL SELECT 'silver.establishments', count(*) FROM silver.establishments
         UNION ALL SELECT 'gold.revenue_by_zip_month', count(*) FROM gold.revenue_by_zip_month
-        UNION ALL SELECT 'gold.top_violations', count(*) FROM gold.top_violations
         UNION ALL SELECT 'gold.score_revenue_correlation', count(*) FROM gold.score_revenue_correlation
     """)
     return jsonify(runs=runs, counts=counts)
