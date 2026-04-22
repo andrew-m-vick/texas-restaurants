@@ -15,6 +15,7 @@ airflow/airflow.db
 airflow/airflow.cfg
 airflow/webserver_config.py
 data/
+!app/static/data/
 dist/
 build/
 *.egg-info/
