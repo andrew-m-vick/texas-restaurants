@@ -19,7 +19,7 @@ COLUMNS = [
 
 def run():
     with track_run("ingest_austin_inspections", "bronze") as state, engine.begin() as conn:
-        conn.execute(text("DELETE FROM bronze.inspections WHERE city = 'AUSTIN'"))
+        conn.execute(text("TRUNCATE bronze.inspections"))
         total = 0
         insert_sql = text(
             f"INSERT INTO bronze.inspections ({', '.join(COLUMNS)}, raw) "
