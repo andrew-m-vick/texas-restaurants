@@ -113,10 +113,30 @@ def api_overview():
     c = _city()
     w_mb_sql, w_params = _window_predicate("obligation_end_date")
     w_insp_sql, _ = _window_predicate("inspection_date")
+
+    # Establishments with activity in the window = had an inspection or had
+    # reported receipts within the time range. For window=all this collapses
+    # to all establishments.
+    est_in_window = f"""
+        e.id IN (
+          SELECT DISTINCT e2.id FROM silver.establishments e2
+          LEFT JOIN silver.inspections i
+            ON i.city = e2.city AND i.facility_id = ANY(e2.facility_ids)
+                {w_insp_sql}
+          LEFT JOIN silver.mixed_beverage mb
+            ON mb.city = e2.city
+           AND mb.taxpayer_number = e2.mb_taxpayer_number
+           AND mb.location_number = e2.mb_location_number
+                {w_mb_sql}
+          WHERE i.id IS NOT NULL OR mb.id IS NOT NULL
+        )
+    """
+
     kpis = _fetch(
         f"""
         SELECT
-          (SELECT count(*) FROM silver.establishments WHERE {_city_clause()}) AS establishments,
+          (SELECT count(*) FROM silver.establishments e
+             WHERE {_city_clause("e.city")} AND {est_in_window}) AS establishments,
           (SELECT round(avg(score)::numeric, 2) FROM silver.inspections
               WHERE score IS NOT NULL AND {_city_clause()} {w_insp_sql}) AS avg_score,
           (SELECT coalesce(sum(total_receipts), 0) FROM silver.mixed_beverage
@@ -128,8 +148,9 @@ def api_overview():
     )
     by_city = _fetch(
         f"""
-        SELECT city,
-          (SELECT count(*) FROM silver.establishments e WHERE e.city = c.city) AS establishments,
+        SELECT c.city,
+          (SELECT count(*) FROM silver.establishments e
+             WHERE e.city = c.city AND {est_in_window}) AS establishments,
           (SELECT round(avg(score)::numeric, 2) FROM silver.inspections i
              WHERE i.city = c.city AND score IS NOT NULL {w_insp_sql}) AS avg_score,
           (SELECT coalesce(sum(total_receipts), 0) FROM silver.mixed_beverage m
@@ -137,7 +158,7 @@ def api_overview():
           (SELECT count(*) FROM silver.inspections i
              WHERE i.city = c.city {w_insp_sql}) AS inspections
         FROM (SELECT DISTINCT city FROM silver.establishments) c
-        ORDER BY city
+        ORDER BY c.city
         """,
         **w_params,
     )
