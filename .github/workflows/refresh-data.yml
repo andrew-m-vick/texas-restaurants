@@ -10,8 +10,10 @@ name: Refresh data
 
 on:
   schedule:
-    # Sundays at 07:00 UTC (≈ Saturday late night CST)
-    - cron: '0 7 * * 0'
+    # 1st of each month at 07:00 UTC. TX Mixed Beverage releases monthly;
+    # Austin inspections update weekly but drift is fine at this resolution.
+    # Dallas is sunset (Jan 2024) so it doesn't need refreshing at all.
+    - cron: '0 7 1 * *'
   workflow_dispatch:  # manual trigger from the Actions tab
 
 concurrency:
