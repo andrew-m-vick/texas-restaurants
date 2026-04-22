@@ -9,7 +9,7 @@ Chart.defaults.borderColor = '#262b36';
 function cityParam(extra = '') {
   const qs = new URLSearchParams();
   if (window.SELECTED_CITY && window.SELECTED_CITY !== 'ALL') qs.set('city', window.SELECTED_CITY);
-  if (window.SELECTED_WINDOW && window.SELECTED_WINDOW !== '12m') qs.set('window', window.SELECTED_WINDOW);
+  if (window.SELECTED_WINDOW && window.SELECTED_WINDOW !== '5y') qs.set('window', window.SELECTED_WINDOW);
   if (extra) extra.split('&').filter(Boolean).forEach(pair => {
     const [k, v] = pair.split('='); qs.set(k, v);
   });
