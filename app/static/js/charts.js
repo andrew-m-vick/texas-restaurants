@@ -2,6 +2,9 @@ const fmt$ = n => '$' + Number(n || 0).toLocaleString(undefined, {maximumFractio
 const fmtN = n => Number(n || 0).toLocaleString();
 const palette = ['#4cc9f0','#f72585','#7209b7','#3a0ca3','#4361ee','#4895ef','#f9844a','#43aa8b','#f9c74f','#90be6d'];
 const cityColor = { AUSTIN: '#4cc9f0', DALLAS: '#f72585' };
+// Single accent used everywhere ZIP-level data is plotted (overview bars,
+// revenue-by-zip bar, map circles). Picked from palette[2].
+const ZIP_COLOR = '#7209b7';
 
 Chart.defaults.color = '#8b93a4';
 Chart.defaults.borderColor = '#262b36';
@@ -49,7 +52,7 @@ async function renderOverview() {
       data: {
         labels: d.top_zips.map(r => r.zip),
         datasets: [{ label: 'Revenue', data: d.top_zips.map(r => r.receipts),
-          backgroundColor: palette[0] }]
+          backgroundColor: ZIP_COLOR }]
       },
       options: {
         maintainAspectRatio: false, plugins: { legend: { display: false } },
@@ -66,7 +69,7 @@ async function renderOverview() {
       data: {
         labels: d.bottom_zips.map(r => r.zip),
         datasets: [{ label: 'Avg Score', data: d.bottom_zips.map(r => r.avg_score),
-          backgroundColor: palette[1] }]
+          backgroundColor: ZIP_COLOR }]
       },
       options: {
         maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } },
@@ -113,7 +116,7 @@ async function renderRevenue() {
     data: {
       labels: d.by_zip.map(r => r.zip),
       datasets: [{ label: 'Revenue', data: d.by_zip.map(r => r.total),
-        backgroundColor: palette[2] }]
+        backgroundColor: ZIP_COLOR }]
     },
     options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
