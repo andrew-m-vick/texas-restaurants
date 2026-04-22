@@ -53,7 +53,7 @@ async function renderMap() {
     d.zips.forEach(z => {
       const val = metric === 'revenue' ? Number(z.total_receipts) : Number(z.avg_score);
       const radius = 6 + 30 * (val / max);
-      const color = '#7209b7';
+      const color = metric === 'revenue' ? '#ff006e' : '#ffd60a';
       const marker = L.circleMarker([z.latitude, z.longitude], {
         radius, color: '#0b0f1a', fillColor: color, fillOpacity: 0.75, weight: 1.5
       }).bindTooltip(
