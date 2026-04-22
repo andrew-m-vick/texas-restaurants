@@ -52,7 +52,8 @@ async function renderOverview() {
       data: {
         labels: d.top_zips.map(r => r.zip),
         datasets: [{ label: 'Revenue', data: d.top_zips.map(r => r.receipts),
-          backgroundColor: ZIP_COLOR }]
+          backgroundColor: ZIP_COLOR + '80',
+          hoverBackgroundColor: ZIP_COLOR }]
       },
       options: {
         maintainAspectRatio: false, plugins: { legend: { display: false } },
@@ -69,7 +70,8 @@ async function renderOverview() {
       data: {
         labels: d.bottom_zips.map(r => r.zip),
         datasets: [{ label: 'Avg Score', data: d.bottom_zips.map(r => r.avg_score),
-          backgroundColor: ZIP_COLOR }]
+          backgroundColor: ZIP_COLOR + '80',
+          hoverBackgroundColor: ZIP_COLOR }]
       },
       options: {
         maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } },
@@ -116,7 +118,8 @@ async function renderRevenue() {
     data: {
       labels: d.by_zip.map(r => r.zip),
       datasets: [{ label: 'Revenue', data: d.by_zip.map(r => r.total),
-        backgroundColor: ZIP_COLOR }]
+        backgroundColor: ZIP_COLOR + '80',
+        hoverBackgroundColor: ZIP_COLOR }]
     },
     options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
