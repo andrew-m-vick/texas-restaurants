@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Neighborhood Map</h1>
-<p class="muted">ZIP centroids derived from US Census postal data (pgeocode).</p>
+<p class="muted">ZIP centroids derived from US Census postal data (pgeocode). Click a ZIP to see establishments.</p>
 <div class="toolbar">
   <label><input type="radio" name="metric" value="revenue" checked> Revenue intensity</label>
   <label><input type="radio" name="metric" value="score"> Inspection score</label>
 </div>
-<div id="map" style="height: 600px;"></div>
+<div class="map-layout">
+  <div id="map" style="height: 640px;"></div>
+  <aside id="zipPanel" class="zip-panel">
+    <div class="empty-msg">Click a ZIP marker to see its establishments.</div>
+  </aside>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/map.js') }}"></script>

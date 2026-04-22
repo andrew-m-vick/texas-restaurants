@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="estHeader"></div>
+<div class="grid-2">
+  <div class="card"><h2>Inspection History</h2><canvas id="estScores"></canvas></div>
+  <div class="card"><h2>Monthly Receipts</h2><canvas id="estRevenue"></canvas></div>
+</div>
+<div class="card" id="violationsCard" style="display:none">
+  <h2>Violations</h2>
+  <table id="estViolations">
+    <thead><tr><th>Date</th><th>Description</th><th>Points</th><th>Memo</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const id = window.location.pathname.split('/').pop();
+  const d = await (await fetch('/api/establishment/' + id)).json();
+  if (d.error) { document.getElementById('estHeader').innerHTML = '<h1>Not found.</h1>'; return; }
+  const h = d.header;
+  document.getElementById('estHeader').innerHTML = `
+    <h1>${h.canonical_name}</h1>
+    <p class="muted">
+      ${h.canonical_address || ''} · ${h.city} · ${h.zip || '—'}
+      · match: ${h.match_method}${h.match_score ? ` (score ${h.match_score})` : ''}
+    </p>
+  `;
+
+  new Chart(document.getElementById('estScores'), {
+    type: 'line',
+    data: {
+      labels: d.inspections.map(r => r.inspection_date),
+      datasets: [{
+        label: 'Score',
+        data: d.inspections.map(r => r.score),
+        borderColor: '#4cc9f0', backgroundColor: '#4cc9f033',
+        fill: true, tension: 0.1, spanGaps: true,
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      scales: { y: { suggestedMin: 60, suggestedMax: 100 } },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  new Chart(document.getElementById('estRevenue'), {
+    type: 'bar',
+    data: {
+      labels: d.revenue.map(r => r.month),
+      datasets: [
+        { label: 'Liquor', data: d.revenue.map(r => r.liquor_receipts), backgroundColor: '#f72585' },
+        { label: 'Wine', data: d.revenue.map(r => r.wine_receipts), backgroundColor: '#7209b7' },
+        { label: 'Beer', data: d.revenue.map(r => r.beer_receipts), backgroundColor: '#4cc9f0' },
+      ]
+    },
+    options: {
+      maintainAspectRatio: false,
+      scales: { x: { stacked: true }, y: { stacked: true } }
+    }
+  });
+
+  if (d.violations && d.violations.length) {
+    document.getElementById('violationsCard').style.display = '';
+    document.querySelector('#estViolations tbody').innerHTML = d.violations.map(v => `
+      <tr>
+        <td>${v.inspection_date || ''}</td>
+        <td>${v.description || ''}</td>
+        <td>${v.points ?? ''}</td>
+        <td>${v.memo || ''}</td>
+      </tr>
+    `).join('');
+  }
+})();
+</script>
+{% endblock %}

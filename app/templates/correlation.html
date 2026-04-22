@@ -2,7 +2,13 @@
 {% block content %}
 <h1>Inspection Score vs. Revenue</h1>
 <p class="muted">Each point is one matched establishment. Regression line shows the overall trend.</p>
-<div class="card"><canvas id="scatter"></canvas></div>
+<div class="controls-row">
+  <label for="confSlider">Minimum match confidence:</label>
+  <input type="range" id="confSlider" min="0" max="100" value="0" step="5" style="width: 220px;">
+  <span id="confValue">0</span>
+  <span class="muted">(higher = only include higher-quality name/address matches)</span>
+</div>
+<div class="card tall"><canvas id="scatter"></canvas></div>
 <p id="corrStat" class="muted"></p>
 {% endblock %}
 {% block scripts %}<script>renderCorrelation();</script>{% endblock %}
