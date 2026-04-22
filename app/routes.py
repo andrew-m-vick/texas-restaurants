@@ -137,24 +137,37 @@ def api_overview():
         """,
         **w_params,
     )
+    # Top N per city so the "All cities" view surfaces both Austin and Dallas
+    # instead of whichever has more historical data.
     w_month_sql, _ = _window_predicate("month")
     top_zips = _fetch(
         f"""
-        SELECT city, zip, sum(total_receipts) AS receipts
-        FROM gold.revenue_by_zip_month WHERE {_city_clause()} {w_month_sql}
-        GROUP BY city, zip ORDER BY receipts DESC LIMIT 10
+        WITH ranked AS (
+          SELECT city, zip, sum(total_receipts) AS receipts,
+            row_number() OVER (PARTITION BY city
+              ORDER BY sum(total_receipts) DESC) AS rn
+          FROM gold.revenue_by_zip_month
+          WHERE {_city_clause()} {w_month_sql}
+          GROUP BY city, zip
+        )
+        SELECT city, zip, receipts FROM ranked WHERE rn <= 5
+        ORDER BY receipts DESC
         """,
         city=c, **w_params,
     )
     bottom_zips = _fetch(
         f"""
-        SELECT city, zip, avg(score)::numeric(5,2) AS avg_score
-        FROM silver.inspections
-        WHERE zip IS NOT NULL AND score IS NOT NULL
-          AND {_city_clause()} {w_insp_sql}
-        GROUP BY city, zip
-        HAVING avg(score) > 0
-        ORDER BY avg_score ASC LIMIT 10
+        WITH ranked AS (
+          SELECT city, zip, avg(score)::numeric(5,2) AS avg_score,
+            row_number() OVER (PARTITION BY city ORDER BY avg(score) ASC) AS rn
+          FROM silver.inspections
+          WHERE zip IS NOT NULL AND score IS NOT NULL
+            AND {_city_clause()} {w_insp_sql}
+          GROUP BY city, zip
+          HAVING avg(score) > 0
+        )
+        SELECT city, zip, avg_score FROM ranked WHERE rn <= 5
+        ORDER BY avg_score ASC
         """,
         city=c, **w_params,
     )
@@ -206,23 +219,35 @@ def api_inspections():
         """,
         city=c, **w_params,
     )
+    # Top N per city so clicking the City column actually reveals Austin rows
+    # instead of only the Dallas-dominated tail of low-score establishments.
     repeat = _fetch(
         f"""
-        SELECT
-          e.id AS establishment_id,
-          e.city, e.canonical_name, e.zip,
-          count(i.id) AS inspection_count,
-          count(*) FILTER (WHERE i.score < 85) AS low_score_count,
-          avg(i.score)::numeric(5,2) AS avg_score,
-          min(i.score)::numeric(5,2) AS min_score
-        FROM silver.establishments e
-        JOIN silver.inspections i
-          ON i.city = e.city AND i.facility_id = ANY(e.facility_ids)
-        WHERE {_city_clause("e.city")} {w_sql.replace("inspection_date", "i.inspection_date")}
-        GROUP BY e.id, e.city, e.canonical_name, e.zip
-        HAVING count(*) FILTER (WHERE i.score < 85) >= 2
+        WITH grouped AS (
+          SELECT
+            e.id AS establishment_id, e.city, e.canonical_name, e.zip,
+            count(i.id) AS inspection_count,
+            count(*) FILTER (WHERE i.score < 85) AS low_score_count,
+            avg(i.score)::numeric(5,2) AS avg_score,
+            min(i.score)::numeric(5,2) AS min_score
+          FROM silver.establishments e
+          JOIN silver.inspections i
+            ON i.city = e.city AND i.facility_id = ANY(e.facility_ids)
+          WHERE {_city_clause("e.city")} {w_sql.replace("inspection_date", "i.inspection_date")}
+          GROUP BY e.id, e.city, e.canonical_name, e.zip
+          HAVING count(*) FILTER (WHERE i.score < 85) >= 2
+        ),
+        ranked AS (
+          SELECT *, row_number() OVER (
+            PARTITION BY city ORDER BY low_score_count DESC, avg_score ASC
+          ) AS rn
+          FROM grouped
+        )
+        SELECT establishment_id, city, canonical_name, zip,
+               inspection_count, low_score_count, avg_score, min_score
+        FROM ranked
+        WHERE rn <= 15
         ORDER BY low_score_count DESC, avg_score ASC
-        LIMIT 25
         """,
         city=c, **w_params,
     )
