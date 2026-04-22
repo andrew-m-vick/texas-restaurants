@@ -127,21 +127,22 @@ Approach in [`pipeline/silver/match_establishments.py`](pipeline/silver/match_es
 | MB-only (no inspection pair found) | 2,121 | 58.2 |
 | Inspection-only (no MB liquor permit) | 5,332 | — |
 
+TABC licenses are attached to the resulting establishments in a second ZIP-blocked fuzzy pass ([`pipeline/silver/match_licenses.py`](pipeline/silver/match_licenses.py)) using the same scoring. Matches are written to `silver.establishment_licenses` rather than stuffing an array into `silver.establishments`, so the matcher stays narrow and a single establishment can carry multiple license rows (common for businesses that hold both on-premise and off-premise permits).
+
 ## Dashboard
 
-Seven views:
+Six views plus per-establishment detail:
 
 | Tab / Page | What's there |
 | --- | --- |
 | Overview | Headline KPIs (window-scoped) + top/bottom ZIPs |
 | Revenue | Monthly time series, revenue by ZIP |
 | Inspections | Score distribution (A/B/C/D), repeat low-score establishments (sortable) |
-| Correlation | Log-y scatter with regression line + Pearson *r*, **match-confidence slider** to filter by provenance |
+| Correlation | Score-vs-revenue log-y scatter with regression line + Pearson *r* (with **match-confidence slider** to filter by provenance), plus **tenure-vs-score** scatter from TABC licenses, permit-status distribution, and ZIP-level permit churn |
 | Map | Leaflet ZIP-level circle map with side panel — click any ZIP to list its establishments and drill into individual records |
-| Lifecycle | TABC permit-status distribution, gun-sign classification, **tenure vs. inspection score** scatter, ZIP-level permit churn |
 | Browse | Sortable/filterable table of all 8,630 establishments |
 | Pipeline | Live OPS tab: row counts by layer, recent DAG runs with status |
-| `/establishment/<id>` | Per-restaurant detail: inspection history line chart, stacked monthly receipts (liquor/wine/beer) |
+| `/establishment/<id>` | Per-restaurant detail: inspection history line chart, stacked monthly receipts (liquor/wine/beer), TABC license table with derived tenure |
 
 Global header also has a **restaurant search** (2+ character typeahead) and a **time-window filter** (12 months / 3 years / 5 years / all time).
 
