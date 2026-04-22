@@ -100,6 +100,8 @@ What this means practically:
 - **Full warehouse still intact**: all the SQL in [`pipeline/gold/aggregates.py`](pipeline/gold/aggregates.py) and [`pipeline/export/static_json.py`](pipeline/export/static_json.py) (window functions, CTEs, `FILTER` clauses, fuzzy-match array joins, correlated subqueries for per-establishment stats) runs against real Postgres every refresh — it's just that the *result* gets shipped instead of the DB.
 - **Tradeoff**: data is only as fresh as the last commit. For a dataset whose source itself updates monthly, this is a non-issue.
 
+Because every response is a static file, turning the site into a PWA is essentially free. A [manifest](app/static/manifest.webmanifest) + [service worker](app/static/sw.js) precache the shell on install and serve pages and JSON stale-while-revalidate. The site is installable on desktop and iOS/Android, and once loaded works fully offline.
+
 ### Why medallion?
 
 - **Bronze** is append-on-truncate raw. If a field name changes upstream, nothing downstream breaks — I re-ingest, inspect the JSONB, and patch silver.
