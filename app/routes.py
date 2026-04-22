@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request
+import os
+from flask import Blueprint, render_template, request, send_from_directory, current_app
 from pipeline.config import TARGET_CITIES
 
 bp = Blueprint("main", __name__)
@@ -75,3 +76,14 @@ def establishments():
 @bp.route("/establishment/<int:est_id>")
 def establishment(est_id: int):
     return _render("establishment.html", "")
+
+
+# Service workers must be served from the scope they control — browsers
+# won't let /static/sw.js control the root. Expose it at /sw.js.
+@bp.route("/sw.js")
+def service_worker():
+    return send_from_directory(
+        os.path.join(current_app.root_path, "static"),
+        "sw.js",
+        mimetype="application/javascript",
+    )

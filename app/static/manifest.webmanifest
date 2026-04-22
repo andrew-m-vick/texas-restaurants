@@ -1,0 +1,19 @@
+{
+  "name": "Austin Restaurant Analytics",
+  "short_name": "Austin Rest",
+  "description": "Medallion data warehouse joining Austin food inspections, Texas Mixed Beverage receipts, and TABC license records.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0f1115",
+  "background_color": "#0f1115",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

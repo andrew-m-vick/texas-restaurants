@@ -33,7 +33,7 @@ This is a genuine null result, and I think that's more interesting than a contri
 | Geocoding | `pgeocode` (offline US postal-code centroids) |
 | Orchestration | Apache Airflow (+ GitHub Actions cron for hosted refresh) |
 | Serving | Flask (static-only — no DB at runtime) |
-| Frontend | Chart.js, Leaflet, vanilla JS |
+| Frontend | Chart.js, Leaflet, vanilla JS, PWA (manifest + service worker) |
 | Infra | Docker Compose (Postgres, local) · GitHub Actions (ETL) · Railway (Flask hosting) |
 
 ## Data sources
