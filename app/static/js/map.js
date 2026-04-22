@@ -1,7 +1,11 @@
 async function renderMap() {
-  const cityQs = (window.SELECTED_CITY && window.SELECTED_CITY !== 'ALL')
-    ? `?city=${window.SELECTED_CITY}` : '';
-  const d = await (await fetch('/api/map' + cityQs)).json();
+  const w = window.SELECTED_WINDOW || '5y';
+  const [d, estBundle] = await Promise.all([
+    (await fetch(`/static/data/map-${w}.json`)).json(),
+    (await fetch(`/static/data/establishments-${w}.json`)).json(),
+  ]);
+  const allEstablishments = estBundle.rows || [];
+
   const centers = { AUSTIN: [30.27, -97.74], DALLAS: [32.78, -96.80] };
   const center = centers[window.SELECTED_CITY] || [31.5, -97.3];
   const zoom = (window.SELECTED_CITY && window.SELECTED_CITY !== 'ALL') ? 11 : 7;
@@ -13,19 +17,20 @@ async function renderMap() {
   let layer = L.layerGroup().addTo(map);
   const panel = document.getElementById('zipPanel');
 
-  async function showZip(zip, city) {
-    panel.innerHTML = '<div class="empty-msg"><span class="spinner"></span> Loading…</div>';
-    const qs = new URLSearchParams();
-    if (city) qs.set('city', city);
-    const resp = await (await fetch(`/api/zip/${zip}?${qs}`)).json();
-    if (!resp.establishments.length) {
+  function showZip(zip, city) {
+    const matches = allEstablishments
+      .filter(e => e.zip === zip && (!city || e.city === city))
+      .sort((a, b) => (b.avg_monthly_receipts || 0) - (a.avg_monthly_receipts || 0))
+      .slice(0, 50);
+
+    if (!matches.length) {
       panel.innerHTML = `<h3>ZIP ${zip}</h3><div class="empty-msg">No establishments.</div>`;
       return;
     }
     panel.innerHTML = `
-      <h3>ZIP ${zip} <span class="muted" style="font-size:0.85rem;font-weight:normal">· ${resp.establishments.length} establishments</span></h3>
+      <h3>ZIP ${zip} <span class="muted" style="font-size:0.85rem;font-weight:normal">· ${matches.length} establishments</span></h3>
       <ul class="zip-list">
-        ${resp.establishments.map(e => `
+        ${matches.map(e => `
           <li>
             <a href="/establishment/${e.id}">
               <div class="name">${e.canonical_name}</div>

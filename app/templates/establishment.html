@@ -18,8 +18,9 @@
 <script>
 (async function () {
   const id = window.location.pathname.split('/').pop();
-  const d = await (await fetch('/api/establishment/' + id)).json();
-  if (d.error) { document.getElementById('estHeader').innerHTML = '<h1>Not found.</h1>'; return; }
+  const resp = await fetch('/static/data/establishment/' + id + '.json');
+  if (!resp.ok) { document.getElementById('estHeader').innerHTML = '<h1>Not found.</h1>'; return; }
+  const d = await resp.json();
   const h = d.header;
   document.getElementById('estBreadcrumbs').innerHTML = `
     <a href="/establishments">← Browse</a>

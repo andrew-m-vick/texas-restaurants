@@ -6,17 +6,14 @@ const cityColor = { AUSTIN: '#4cc9f0', DALLAS: '#f72585' };
 Chart.defaults.color = '#8b93a4';
 Chart.defaults.borderColor = '#262b36';
 
-function cityParam(extra = '') {
-  const qs = new URLSearchParams();
-  if (window.SELECTED_WINDOW && window.SELECTED_WINDOW !== '5y') qs.set('window', window.SELECTED_WINDOW);
-  if (extra) extra.split('&').filter(Boolean).forEach(pair => {
-    const [k, v] = pair.split('='); qs.set(k, v);
-  });
-  const s = qs.toString();
-  return s ? `?${s}` : '';
+// Static JSON lookup. Endpoints like /api/overview are now precomputed
+// into /static/data/overview-<window>.json by the monthly ETL.
+function dataUrl(endpoint) {
+  const w = window.SELECTED_WINDOW || '5y';
+  return `/static/data/${endpoint}-${w}.json`;
 }
-async function fetchJSON(url, extra = '') {
-  return (await fetch(url + cityParam(extra))).json();
+async function fetchJSON(endpoint) {
+  return (await fetch(dataUrl(endpoint))).json();
 }
 
 // ---------- OVERVIEW ----------
@@ -25,7 +22,7 @@ async function renderOverview() {
   const windowLabels = {'12m':'(last 12 mo)','3y':'(last 3 yr)','5y':'(last 5 yr)','all':'(2007–present)'};
   const wl = document.getElementById('windowLabel');
   if (wl) wl.textContent = windowLabels[window.SELECTED_WINDOW] || '';
-  const d = await fetchJSON('/api/overview');
+  const d = await fetchJSON('overview');
   clearLoading('kpis', 'topZips', 'bottomZips');
   const k = d.kpis || {};
   document.getElementById('kpis').innerHTML = `
@@ -83,7 +80,7 @@ async function renderOverview() {
 // ---------- REVENUE ----------
 async function renderRevenue() {
   showLoading('monthly', 'byZip');
-  const d = await fetchJSON('/api/revenue');
+  const d = await fetchJSON('revenue');
   clearLoading('monthly', 'byZip');
 
   if (!d.monthly.length) replaceWithEmpty('monthly', 'No monthly revenue data.');
@@ -119,7 +116,7 @@ async function renderRevenue() {
 // ---------- INSPECTIONS ----------
 async function renderInspections() {
   showLoading('scoreDist', 'topViolations');
-  const d = await fetchJSON('/api/inspections');
+  const d = await fetchJSON('inspections');
   clearLoading('scoreDist', 'topViolations');
 
   if (!d.distribution.length) replaceWithEmpty('scoreDist', 'No score data.');
@@ -168,7 +165,7 @@ let corrAllPoints = [];
 
 async function renderCorrelation() {
   showLoading('scatter');
-  const d = await fetchJSON('/api/correlation');
+  const d = await fetchJSON('correlation');
   clearLoading('scatter');
   corrAllPoints = d.points;
   const slider = document.getElementById('confSlider');
@@ -270,7 +267,7 @@ function drawCorrelation(minConf) {
 
 // ---------- OPS ----------
 async function renderOps() {
-  const d = await (await fetch('/api/ops')).json();
+  const d = await (await fetch('/static/data/ops.json')).json();
   document.querySelector('#countsTable tbody').innerHTML = d.counts.map(r =>
     `<tr><td>${r.tbl}</td><td>${fmtN(r.n)}</td></tr>`
   ).join('');

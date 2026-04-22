@@ -2,7 +2,9 @@
 
 End-to-end data pipeline and analytics dashboard joining two public Texas datasets that nobody joins: **state mixed beverage gross receipts** (who sells liquor, and how much) and **City of Austin food service inspections** (how clean those kitchens actually are).
 
-Built around a medallion (bronze → silver → gold) warehouse, orchestrated by Airflow, served through a Flask + Chart.js + Leaflet dashboard.
+Built around a medallion (bronze → silver → gold) warehouse in PostgreSQL, orchestrated by Airflow (with a GitHub Actions mirror for hosted refresh), served through a Flask + Chart.js + Leaflet dashboard.
+
+> **Serving model:** Postgres does the heavy lifting at *build time* — every query that backs a dashboard view is materialized into static JSON by the monthly ETL and committed alongside the code. Production only needs to serve Flask + static files; no hosted database. See [Serving architecture](#serving-architecture) below.
 
 **Live:** https://texas-restaurants-production.up.railway.app/ *(first load takes ~20s — the server sleeps when idle to keep hosting costs near zero)*
 
@@ -30,9 +32,9 @@ This is a genuine null result, and I think that's more interesting than a contri
 | Transform | `pandas`, `rapidfuzz`, SQL |
 | Geocoding | `pgeocode` (offline US postal-code centroids) |
 | Orchestration | Apache Airflow (+ GitHub Actions cron for hosted refresh) |
-| Serving | Flask, SQLAlchemy |
+| Serving | Flask (static-only — no DB at runtime) |
 | Frontend | Chart.js, Leaflet, vanilla JS |
-| Infra | Docker Compose (Postgres) · Railway (hosting) |
+| Infra | Docker Compose (Postgres, local) · GitHub Actions (ETL) · Railway (Flask hosting) |
 
 ## Data sources
 
@@ -71,10 +73,31 @@ This is a genuine null result, and I think that's more interesting than a contri
                      └───────────┬────────────┘
                                  ▼
                      ┌────────────────────────┐
+                     │  export_static_json    │
+                     │  (materializes every   │
+                     │   view as JSON)        │
+                     └───────────┬────────────┘
+                                 │  git commit + push
+                                 ▼
+                     ┌────────────────────────┐
                      │  Flask + Chart.js      │
                      │  + Leaflet dashboard   │
+                     │  (no DB at runtime)    │
                      └────────────────────────┘
 ```
+
+### Serving architecture
+
+Most dashboards pay to keep Postgres running 24/7 just to answer the same handful of aggregate queries over and over. For a monthly-refreshed dataset, that's backwards — the data only changes 12 times a year, so the serving-time queries are pure waste.
+
+Instead, the final pipeline step is [`pipeline/export/static_json.py`](pipeline/export/static_json.py), which runs every query that backs a dashboard view and writes the result to `app/static/data/*.json` — one file per `(endpoint, time-window)` variant. GitHub Actions commits the refreshed JSON back to `main`, Railway redeploys Flask, and the browser fetches directly from `/static/data/...`. Postgres never serves a request in production.
+
+What this means practically:
+
+- **$0 database hosting** — the only monthly compute cost is the ~5 minutes of GitHub Actions runtime that rebuilds the warehouse from scratch.
+- **Sub-millisecond response times** — every dashboard query is a static file.
+- **Full warehouse still intact**: all the SQL in [`pipeline/gold/aggregates.py`](pipeline/gold/aggregates.py) and [`pipeline/export/static_json.py`](pipeline/export/static_json.py) (window functions, CTEs, `FILTER` clauses, fuzzy-match array joins, correlated subqueries for per-establishment stats) runs against real Postgres every refresh — it's just that the *result* gets shipped instead of the DB.
+- **Tradeoff**: data is only as fresh as the last commit. For a dataset whose source itself updates monthly, this is a non-issue.
 
 ### Why medallion?
 
@@ -138,6 +161,7 @@ python -m pipeline.silver.clean_mixed_beverage
 python -m pipeline.silver.clean_inspections
 python -m pipeline.silver.match_establishments
 python -m pipeline.gold.aggregates
+python -m pipeline.export.static_json   # bakes /static/data/*.json
 
 # 4. Serve the dashboard
 python run.py   # http://localhost:5000
@@ -162,7 +186,7 @@ airflow standalone
 | `ingest_mixed_beverage` | `@monthly` | → `build_silver_layer` |
 | `ingest_inspections` | `@weekly` | → `build_silver_layer` |
 | `build_silver_layer` | manual/trigger | → `build_gold_layer` |
-| `build_gold_layer` | manual/trigger | — |
+| `build_gold_layer` | manual/trigger | `build_aggregates` → `export_static_json` |
 
 For the hosted Railway deployment, a GitHub Actions workflow at [`.github/workflows/refresh-data.yml`](.github/workflows/refresh-data.yml) runs the same pipeline on a monthly cron.
 

@@ -1,8 +1,9 @@
 name: Refresh data
 
-# Refreshes the Railway Postgres against live sources:
-#   - Texas Mixed Beverage receipts (filtered to Austin)
-#   - Austin inspections (live Socrata feed)
+# Runs the full ETL against an ephemeral Postgres service container,
+# exports static JSON to app/static/data/, and commits the refreshed
+# JSON back to main. Production (Railway) only serves Flask + static
+# files — no hosted Postgres required.
 
 on:
   schedule:
@@ -18,10 +19,27 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/austin_restaurants
       SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
       TARGET_CITIES: AUSTIN
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: austin_restaurants
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +52,13 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Initialize schemas
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d austin_restaurants -f sql/01_schemas.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d austin_restaurants -f sql/02_bronze.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d austin_restaurants -f sql/03_silver.sql
+          PGPASSWORD=postgres psql -h localhost -U postgres -d austin_restaurants -f sql/04_gold.sql
 
       - name: Ingest Texas Mixed Beverage (Austin)
         run: python -m pipeline.bronze.mixed_beverage
@@ -50,19 +75,17 @@ jobs:
       - name: Rebuild gold layer
         run: python -m pipeline.gold.aggregates
 
-      - name: Report row counts
+      - name: Export static JSON
+        run: python -m pipeline.export.static_json
+
+      - name: Commit refreshed data
         run: |
-          python - <<'PY'
-          from sqlalchemy import create_engine, text
-          from pipeline.config import DATABASE_URL
-          e = create_engine(DATABASE_URL)
-          tables = [
-              "bronze.mixed_beverage", "bronze.inspections",
-              "silver.establishments",
-              "gold.revenue_by_zip_month", "gold.score_revenue_correlation",
-          ]
-          with e.connect() as c:
-              for t in tables:
-                  n = c.execute(text(f"SELECT count(*) FROM {t}")).scalar_one()
-                  print(f"{t:40s} {n:>10,}")
-          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/static/data
+          if git diff --cached --quiet; then
+            echo "No data changes."
+          else
+            git commit -m "Monthly data refresh ($(date -u +%Y-%m-%d))"
+            git push
+          fi
