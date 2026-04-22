@@ -24,10 +24,14 @@ WINDOWS = {
     "all": ("All time (2007\u2013present)", None),
 }
 
+# 5y is the default because Dallas's inspection dataset is sunset (Jan 2024);
+# anything shorter would hide Dallas entirely in the default view.
+DEFAULT_WINDOW = "5y"
+
 
 def _window() -> str:
     w = (request.args.get("window") or "").strip().lower()
-    return w if w in WINDOWS else "12m"
+    return w if w in WINDOWS else DEFAULT_WINDOW
 
 
 def _window_predicate(col: str) -> tuple[str, dict]:

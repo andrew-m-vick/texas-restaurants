@@ -48,7 +48,7 @@
       {% for key, label in tabs %}
         {% set qs = [] %}
         {% if selected_city != 'ALL' %}{% set _ = qs.append('city=' + selected_city) %}{% endif %}
-        {% if selected_window != '12m' %}{% set _ = qs.append('window=' + selected_window) %}{% endif %}
+        {% if selected_window != '5y' %}{% set _ = qs.append('window=' + selected_window) %}{% endif %}
         <a href="{{ url_for('main.' + ('map_view' if key=='map' else key)) }}{% if qs %}?{{ qs|join('&') }}{% endif %}"
            class="{{ 'active' if active==key else '' }}">{{ label }}</a>
       {% endfor %}
@@ -68,7 +68,7 @@
     });
     document.getElementById('windowSelect').addEventListener('change', (e) => {
       const url = new URL(window.location.href);
-      if (e.target.value === '12m') url.searchParams.delete('window');
+      if (e.target.value === '5y') url.searchParams.delete('window');
       else url.searchParams.set('window', e.target.value);
       window.location.href = url.toString();
     });
