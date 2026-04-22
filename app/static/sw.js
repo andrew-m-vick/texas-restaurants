@@ -4,7 +4,7 @@
 // at runtime so pages and JSON data files load instantly from cache and
 // update in the background. Bump CACHE_VERSION whenever the shell changes.
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `austin-rest-${CACHE_VERSION}`;
 
 const SHELL = [
@@ -22,6 +22,9 @@ const SHELL = [
   '/static/js/map.js',
   '/static/js/establishments.js',
   '/static/favicon.svg',
+  '/static/icon-180.png',
+  '/static/icon-192.png',
+  '/static/icon-512.png',
   '/static/manifest.webmanifest',
 ];
 
