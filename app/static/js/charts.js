@@ -47,9 +47,9 @@ async function renderOverview() {
     new Chart(el, {
       type: 'bar',
       data: {
-        labels: d.top_zips.map(r => `${r.zip} (${r.city[0]})`),
+        labels: d.top_zips.map(r => r.zip),
         datasets: [{ label: 'Revenue', data: d.top_zips.map(r => r.receipts),
-          backgroundColor: d.top_zips.map(r => cityColor[r.city] || palette[0]) }]
+          backgroundColor: palette[0] }]
       },
       options: {
         maintainAspectRatio: false, plugins: { legend: { display: false } },
@@ -64,9 +64,9 @@ async function renderOverview() {
     new Chart(el, {
       type: 'bar',
       data: {
-        labels: d.bottom_zips.map(r => `${r.zip} (${r.city[0]})`),
+        labels: d.bottom_zips.map(r => r.zip),
         datasets: [{ label: 'Avg Score', data: d.bottom_zips.map(r => r.avg_score),
-          backgroundColor: d.bottom_zips.map(r => cityColor[r.city] || palette[1]) }]
+          backgroundColor: palette[1] }]
       },
       options: {
         maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } },
@@ -85,19 +85,25 @@ async function renderRevenue() {
 
   if (!d.monthly.length) replaceWithEmpty('monthly', 'No monthly revenue data.');
   else {
-    const byCity = {};
-    for (const r of d.monthly) (byCity[r.city] = byCity[r.city] || []).push({ x: r.month, y: Number(r.total) });
-    const datasets = Object.entries(byCity).map(([city, pts]) => ({
-      label: city, data: pts,
-      borderColor: cityColor[city] || palette[0],
-      backgroundColor: (cityColor[city] || palette[0]) + '33',
-      fill: false, tension: 0.2,
-    }));
+    const byMonth = new Map();
+    for (const r of d.monthly) byMonth.set(r.month, (byMonth.get(r.month) || 0) + Number(r.total));
+    const months = [...byMonth.keys()].sort();
     new Chart(document.getElementById('monthly'), {
       type: 'line',
-      data: { datasets },
-      options: { maintainAspectRatio: false,
-        scales: { x: { type: 'category', labels: [...new Set(d.monthly.map(r=>r.month))].sort() } } }
+      data: {
+        datasets: [{
+          label: 'Revenue',
+          data: months.map(m => ({ x: m, y: byMonth.get(m) })),
+          borderColor: palette[0],
+          backgroundColor: palette[0] + '33',
+          fill: true, tension: 0.2,
+        }],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { type: 'category', labels: months } },
+      }
     });
   }
 
@@ -105,9 +111,9 @@ async function renderRevenue() {
   else new Chart(document.getElementById('byZip'), {
     type: 'bar',
     data: {
-      labels: d.by_zip.map(r => `${r.zip} (${r.city[0]})`),
+      labels: d.by_zip.map(r => r.zip),
       datasets: [{ label: 'Revenue', data: d.by_zip.map(r => r.total),
-        backgroundColor: d.by_zip.map(r => cityColor[r.city] || palette[2]) }]
+        backgroundColor: palette[2] }]
     },
     options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
@@ -181,21 +187,20 @@ async function renderCorrelation() {
 
 function drawCorrelation(minConf) {
   const filtered = corrAllPoints.filter(p => Number(p.match_score || 0) >= minConf);
-  const byCity = {};
+  const all = [];
   for (const p of filtered) {
     const y = Number(p.avg_monthly_receipts);
     if (y <= 0) continue;
-    (byCity[p.city] = byCity[p.city] || []).push({
+    all.push({
       x: Number(p.avg_score), y,
       name: p.canonical_name, zip: p.zip, id: p.establishment_id,
     });
   }
-  const datasets = Object.entries(byCity).map(([city, pts]) => ({
-    label: `${city} (n=${pts.length})`, data: pts,
-    backgroundColor: (cityColor[city] || palette[0]) + 'bb',
+  const datasets = [{
+    label: `n=${all.length}`, data: all,
+    backgroundColor: palette[0] + 'bb',
     pointRadius: 3,
-  }));
-  const all = Object.values(byCity).flat();
+  }];
   const { m: slope, r: rawR } = linreg(all);
   const logPts = all.map(p => ({ x: p.x, y: Math.log10(p.y) }));
   const lg = linreg(logPts);
@@ -274,15 +279,6 @@ async function renderLifecycle() {
     data: {
       labels: d.status.map(r => r.status || '—'),
       datasets: [{ data: d.status.map(r => r.n), backgroundColor: palette }],
-    },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-  });
-
-  new Chart(document.getElementById('gunSignChart'), {
-    type: 'doughnut',
-    data: {
-      labels: d.gun_sign.map(r => r.gun_sign),
-      datasets: [{ data: d.gun_sign.map(r => r.n), backgroundColor: palette }],
     },
     options: { maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
   });
@@ -367,7 +363,6 @@ async function renderLifecycle() {
       <td class="num">${r.total}</td>
       <td class="num">${r.active}</td>
       <td class="num">${r.expired}</td>
-      <td class="num">${r.cancelled}</td>
       <td class="num">${r.pct_expired}%</td>
     </tr>
   `).join('');

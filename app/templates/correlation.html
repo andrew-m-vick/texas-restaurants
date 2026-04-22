@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Inspection Score vs. Revenue</h1>
-<p class="muted">Each point is one matched establishment. Regression line shows the overall trend.</p>
+<h1>Correlation &amp; Lifecycle</h1>
+<p class="muted">Two lenses on the same matched establishments: revenue vs. inspection score, and tenure vs. inspection score.</p>
+
+<h2 style="margin-top:1.5rem">Inspection score vs. revenue</h2>
 <div class="controls-row">
   <label for="confSlider">Minimum match confidence:</label>
   <input type="range" id="confSlider" min="0" max="100" value="0" step="5" style="width: 220px;">
@@ -10,5 +12,39 @@
 </div>
 <div class="card tall"><canvas id="scatter"></canvas></div>
 <p id="corrStat" class="muted"></p>
+
+<h2 style="margin-top:2rem">Tenure vs. inspection score</h2>
+<p class="muted">Years since earliest TABC permit (original-issue date) plotted against the establishment's average inspection score. Each point is one establishment with at least two inspections.</p>
+<div class="card tall"><canvas id="tenureScatter"></canvas></div>
+<p id="tenureStat" class="muted"></p>
+
+<div class="grid-2" style="margin-top:1.5rem">
+  <div class="card">
+    <h2>TABC permit status</h2>
+    <canvas id="statusChart"></canvas>
+  </div>
+  <div class="card">
+    <h2>Permit churn by ZIP</h2>
+    <table id="statusByZip" class="hover-table">
+      <thead>
+        <tr>
+          <th data-sort="zip">ZIP</th>
+          <th data-sort="total" class="num">Permits</th>
+          <th data-sort="active" class="num">Active</th>
+          <th data-sort="expired" class="num">Expired</th>
+          <th data-sort="pct_expired" class="num">% Expired</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}
-{% block scripts %}<script>renderCorrelation();</script>{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  await renderCorrelation();
+  await renderLifecycle();
+})();
+</script>
+{% endblock %}

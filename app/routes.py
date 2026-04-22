@@ -67,11 +67,6 @@ def ops():
     return _render("ops.html", "ops")
 
 
-@bp.route("/lifecycle")
-def lifecycle():
-    return _render("lifecycle.html", "lifecycle")
-
-
 @bp.route("/establishments")
 def establishments():
     return _render("establishments.html", "establishments")

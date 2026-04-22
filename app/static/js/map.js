@@ -53,11 +53,11 @@ async function renderMap() {
     d.zips.forEach(z => {
       const val = metric === 'revenue' ? Number(z.total_receipts) : Number(z.avg_score);
       const radius = 6 + 30 * (val / max);
-      const color = cityColorFor(z.city, metric);
+      const color = metric === 'revenue' ? '#ff006e' : '#ffd60a';
       const marker = L.circleMarker([z.latitude, z.longitude], {
-        radius, color, fillColor: color, fillOpacity: 0.5, weight: 1
+        radius, color: '#0b0f1a', fillColor: color, fillOpacity: 0.75, weight: 1.5
       }).bindTooltip(
-        `<b>ZIP ${z.zip}</b> (${z.city})<br>` +
+        `<b>ZIP ${z.zip}</b><br>` +
         `Establishments: ${z.establishments}<br>` +
         `Avg score: ${Number(z.avg_score).toFixed(1)}<br>` +
         `Revenue: $${Number(z.total_receipts).toLocaleString()}`
@@ -65,11 +65,6 @@ async function renderMap() {
       marker.on('click', () => showZip(z.zip, z.city));
       marker.addTo(layer);
     });
-  }
-
-  function cityColorFor(city, metric) {
-    if (metric === 'revenue') return city === 'DALLAS' ? '#f72585' : '#4cc9f0';
-    return city === 'DALLAS' ? '#f9844a' : '#43aa8b';
   }
 
   draw('revenue');
