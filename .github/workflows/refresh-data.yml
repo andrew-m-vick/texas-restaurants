@@ -1,0 +1,74 @@
+name: Refresh data
+
+# Refreshes the Railway Postgres against live sources:
+#   - Texas Mixed Beverage receipts (both Austin + Dallas)
+#   - Austin inspections (live Socrata feed)
+# Dallas inspections dataset is sunset (2024) so we don't re-ingest it;
+# the Dallas bronze data stays as loaded, and silver/gold still pick it up
+# on rebuild because clean_inspections/clean_violations read the whole
+# bronze table.
+
+on:
+  schedule:
+    # Sundays at 07:00 UTC (≈ Saturday late night CST)
+    - cron: '0 7 * * 0'
+  workflow_dispatch:  # manual trigger from the Actions tab
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
+      TARGET_CITIES: AUSTIN,DALLAS
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ingest Texas Mixed Beverage (Austin + Dallas)
+        run: python -m pipeline.bronze.mixed_beverage
+
+      - name: Ingest Austin inspections
+        run: python -m pipeline.bronze.austin_inspections
+
+      - name: Rebuild silver layer
+        run: |
+          python -m pipeline.silver.clean_mixed_beverage
+          python -m pipeline.silver.clean_inspections
+          python -m pipeline.silver.clean_violations
+          python -m pipeline.silver.match_establishments
+
+      - name: Rebuild gold layer
+        run: python -m pipeline.gold.aggregates
+
+      - name: Report row counts
+        run: |
+          python - <<'PY'
+          from sqlalchemy import create_engine, text
+          from pipeline.config import DATABASE_URL
+          e = create_engine(DATABASE_URL)
+          tables = [
+              "bronze.mixed_beverage", "bronze.inspections",
+              "silver.establishments",
+              "gold.revenue_by_zip_month", "gold.score_revenue_correlation",
+          ]
+          with e.connect() as c:
+              for t in tables:
+                  n = c.execute(text(f"SELECT count(*) FROM {t}")).scalar_one()
+                  print(f"{t:40s} {n:>10,}")
+          PY
