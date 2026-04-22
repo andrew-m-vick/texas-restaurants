@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, jsonify, request
+import time
+from functools import wraps
+from flask import Blueprint, render_template, jsonify, request, current_app
 from sqlalchemy import text
 from pipeline.db import engine
 from pipeline.config import TARGET_CITIES
@@ -9,6 +11,30 @@ bp = Blueprint("main", __name__)
 def _fetch(sql: str, **params):
     with engine.connect() as conn:
         return [dict(r) for r in conn.execute(text(sql), params).mappings()]
+
+
+# Simple in-process response cache keyed by (endpoint, full query string).
+# 60s TTL — short enough that a data refresh is reflected in a minute,
+# long enough that normal user navigation feels instant after warmup.
+_response_cache: dict = {}
+_CACHE_TTL = 60
+
+
+def cache_response(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        key = (fn.__name__, request.query_string.decode())
+        now = time.time()
+        entry = _response_cache.get(key)
+        if entry and now - entry[0] < _CACHE_TTL:
+            return current_app.response_class(entry[1], mimetype="application/json")
+        resp = fn(*args, **kwargs)
+        try:
+            _response_cache[key] = (now, resp.get_data(as_text=True))
+        except Exception:
+            pass  # don't poison cache on non-Response returns
+        return resp
+    return wrapper
 
 
 def _city() -> str | None:
@@ -109,6 +135,7 @@ def _city_clause(col: str = "city") -> str:
 
 
 @bp.route("/api/overview")
+@cache_response
 def api_overview():
     c = _city()
     w_mb_sql, w_params = _window_predicate("obligation_end_date")
@@ -201,6 +228,7 @@ def api_overview():
 
 
 @bp.route("/api/revenue")
+@cache_response
 def api_revenue():
     c = _city()
     w_sql, w_params = _window_predicate("month")
@@ -224,6 +252,7 @@ def api_revenue():
 
 
 @bp.route("/api/inspections")
+@cache_response
 def api_inspections():
     c = _city()
     w_sql, w_params = _window_predicate("inspection_date")
@@ -291,6 +320,7 @@ def api_inspections():
 
 
 @bp.route("/api/correlation")
+@cache_response
 def api_correlation():
     c = _city()
     w_insp_sql, w_params = _window_predicate("i.inspection_date")
@@ -331,6 +361,7 @@ def api_correlation():
 
 
 @bp.route("/api/map")
+@cache_response
 def api_map():
     c = _city()
     w_mb_sql, w_params = _window_predicate("mb.obligation_end_date")
@@ -445,6 +476,7 @@ def api_establishment(est_id: int):
 
 
 @bp.route("/api/establishments")
+@cache_response
 def api_establishments():
     c = _city()
     q = (request.args.get("q") or "").strip()
