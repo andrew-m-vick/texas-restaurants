@@ -3,10 +3,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv(
+_raw_db_url = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg2://postgres:postgres@localhost:5432/austin_restaurants",
 )
+# Railway/Heroku style: normalize bare "postgresql://" to force the psycopg2 driver.
+if _raw_db_url.startswith("postgresql://"):
+    _raw_db_url = "postgresql+psycopg2://" + _raw_db_url[len("postgresql://"):]
+elif _raw_db_url.startswith("postgres://"):
+    _raw_db_url = "postgresql+psycopg2://" + _raw_db_url[len("postgres://"):]
+DATABASE_URL = _raw_db_url
 
 TX_MIXED_BEVERAGE_URL = os.getenv(
     "TX_MIXED_BEVERAGE_URL", "https://data.texas.gov/resource/naix-2893.json"
