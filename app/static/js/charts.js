@@ -7,9 +7,9 @@ Chart.defaults.color = '#8b93a4';
 Chart.defaults.borderColor = '#262b36';
 
 function cityParam(extra = '') {
-  const c = window.SELECTED_CITY;
   const qs = new URLSearchParams();
-  if (c && c !== 'ALL') qs.set('city', c);
+  if (window.SELECTED_CITY && window.SELECTED_CITY !== 'ALL') qs.set('city', window.SELECTED_CITY);
+  if (window.SELECTED_WINDOW && window.SELECTED_WINDOW !== '12m') qs.set('window', window.SELECTED_WINDOW);
   if (extra) extra.split('&').filter(Boolean).forEach(pair => {
     const [k, v] = pair.split('='); qs.set(k, v);
   });
@@ -23,6 +23,9 @@ async function fetchJSON(url, extra = '') {
 // ---------- OVERVIEW ----------
 async function renderOverview() {
   showLoading('kpis', 'topZips', 'bottomZips');
+  const windowLabels = {'12m':'(last 12 mo)','3y':'(last 3 yr)','5y':'(last 5 yr)','all':'(2007–present)'};
+  const wl = document.getElementById('windowLabel');
+  if (wl) wl.textContent = windowLabels[window.SELECTED_WINDOW] || '';
   const d = await fetchJSON('/api/overview');
   clearLoading('kpis', 'topZips', 'bottomZips');
   const k = d.kpis || {};

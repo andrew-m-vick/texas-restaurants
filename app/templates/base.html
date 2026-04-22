@@ -43,17 +43,31 @@
         {% endfor %}
       </select>
     </div>
+    <div class="city-picker">
+      <label>Window:</label>
+      <select id="windowSelect">
+        {% for key, (label, _) in windows.items() %}
+          <option value="{{ key }}" {% if selected_window == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </header>
   <main>
     {% block content %}{% endblock %}
   </main>
   <script>
     window.SELECTED_CITY = {{ selected_city|tojson }};
+    window.SELECTED_WINDOW = {{ selected_window|tojson }};
     document.getElementById('citySelect').addEventListener('change', (e) => {
-      const v = e.target.value;
       const url = new URL(window.location.href);
-      if (v === 'ALL') url.searchParams.delete('city');
-      else url.searchParams.set('city', v);
+      if (e.target.value === 'ALL') url.searchParams.delete('city');
+      else url.searchParams.set('city', e.target.value);
+      window.location.href = url.toString();
+    });
+    document.getElementById('windowSelect').addEventListener('change', (e) => {
+      const url = new URL(window.location.href);
+      if (e.target.value === '12m') url.searchParams.delete('window');
+      else url.searchParams.set('window', e.target.value);
       window.location.href = url.toString();
     });
   </script>

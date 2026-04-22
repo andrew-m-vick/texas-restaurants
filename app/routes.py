@@ -17,12 +17,35 @@ def _city() -> str | None:
     return c if c in TARGET_CITIES else None
 
 
+WINDOWS = {
+    "12m": ("Last 12 months", "11 months"),
+    "3y":  ("Last 3 years",   "35 months"),
+    "5y":  ("Last 5 years",   "59 months"),
+    "all": ("All time (2007\u2013present)", None),
+}
+
+
+def _window() -> str:
+    w = (request.args.get("window") or "").strip().lower()
+    return w if w in WINDOWS else "12m"
+
+
+def _window_params():
+    w = _window()
+    _, interval = WINDOWS[w]
+    if interval is None:
+        return "", {}
+    return "AND month >= (SELECT max(month) - interval :iv FROM gold.revenue_by_zip_month)", {"iv": interval}
+
+
 def _render(template: str, active: str):
     return render_template(
         template,
         active=active,
         cities=TARGET_CITIES,
         selected_city=_city() or "ALL",
+        windows=WINDOWS,
+        selected_window=_window(),
     )
 
 
@@ -73,17 +96,18 @@ def _city_clause(col: str = "city") -> str:
 @bp.route("/api/overview")
 def api_overview():
     c = _city()
+    w_sql, w_params = _window_params()
     kpis = _fetch(
         f"""
         SELECT
           (SELECT count(*) FROM silver.establishments WHERE {_city_clause()}) AS establishments,
           (SELECT round(avg(score)::numeric, 2) FROM silver.inspections
               WHERE score IS NOT NULL AND {_city_clause()}) AS avg_score,
-          (SELECT coalesce(sum(total_receipts), 0) FROM silver.mixed_beverage
-              WHERE {_city_clause()}) AS total_receipts,
+          (SELECT coalesce(sum(total_receipts), 0) FROM gold.revenue_by_zip_month
+              WHERE {_city_clause()} {w_sql}) AS total_receipts,
           (SELECT count(*) FROM silver.inspections WHERE {_city_clause()}) AS inspections
         """,
-        city=c,
+        city=c, **w_params,
     )
     # Per-city KPIs for side-by-side view when no city filter is active.
     by_city = _fetch(
@@ -102,10 +126,10 @@ def api_overview():
     top_zips = _fetch(
         f"""
         SELECT city, zip, sum(total_receipts) AS receipts
-        FROM gold.revenue_by_zip_month WHERE {_city_clause()}
+        FROM gold.revenue_by_zip_month WHERE {_city_clause()} {w_sql}
         GROUP BY city, zip ORDER BY receipts DESC LIMIT 10
         """,
-        city=c,
+        city=c, **w_params,
     )
     bottom_zips = _fetch(
         f"""
@@ -123,21 +147,22 @@ def api_overview():
 @bp.route("/api/revenue")
 def api_revenue():
     c = _city()
+    w_sql, w_params = _window_params()
     monthly = _fetch(
         f"""
         SELECT month, city, sum(total_receipts) AS total
-        FROM gold.revenue_by_zip_month WHERE {_city_clause()}
+        FROM gold.revenue_by_zip_month WHERE {_city_clause()} {w_sql}
         GROUP BY month, city ORDER BY month
         """,
-        city=c,
+        city=c, **w_params,
     )
     by_zip = _fetch(
         f"""
         SELECT city, zip, sum(total_receipts) AS total
-        FROM gold.revenue_by_zip_month WHERE {_city_clause()}
+        FROM gold.revenue_by_zip_month WHERE {_city_clause()} {w_sql}
         GROUP BY city, zip ORDER BY total DESC LIMIT 15
         """,
-        city=c,
+        city=c, **w_params,
     )
     return jsonify(monthly=monthly, by_zip=by_zip)
 
