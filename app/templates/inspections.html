@@ -3,7 +3,15 @@
 <h1>Inspection Analysis</h1>
 <div class="grid-2">
   <div class="card"><h2>Score Distribution</h2><canvas id="scoreDist"></canvas></div>
-  <div class="card"><h2>Top Violations (Dallas only)</h2><canvas id="topViolations"></canvas></div>
+  <div class="card">
+    <h2>Top Violations <span class="muted" style="font-weight:normal;text-transform:none;letter-spacing:0">(Dallas only)</span></h2>
+    <p class="muted" style="margin:-0.5rem 0 0.75rem;font-size:0.82rem;">
+      Austin's open-data feed publishes only overall inspection scores — no itemized violation codes or TFER text.
+      Dallas's dataset includes up to 15 violations per inspection with codes, points, and full rule language, so this chart
+      reflects Dallas data only.
+    </p>
+    <canvas id="topViolations"></canvas>
+  </div>
 </div>
 <div class="card">
   <h2>Repeat Low-Score Establishments</h2>
