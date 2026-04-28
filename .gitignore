@@ -17,8 +17,12 @@ airflow/webserver_config.py
 data/
 !app/static/data/
 
-# Vite builds the React app here. Generated, not committed.
-app/static/dist/
 dist/
 build/
 *.egg-info/
+
+# Vite build output for the React SPA. Committed so Railway can serve
+# it directly without needing a Node toolchain in the deploy image.
+# Regenerate with: cd frontend && npm run build
+!app/static/dist/
+!app/static/dist/**

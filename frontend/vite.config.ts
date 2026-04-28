@@ -12,7 +12,8 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, '../app/static/dist'),
     emptyOutDir: true,
-    sourcemap: true,
+    // Sourcemaps off — dist/ is committed, no point bloating git history.
+    sourcemap: false,
   },
   server: {
     port: 5173,
