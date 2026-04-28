@@ -87,3 +87,16 @@ def service_worker():
         "sw.js",
         mimetype="application/javascript",
     )
+
+
+# React SPA mounted at /app. Vite builds into app/static/dist with
+# `base: '/app/'`, so all bundle URLs resolve under that prefix.
+# Real files (assets/index-*.js, etc.) are served as-is; anything else
+# falls back to index.html so client-side routing handles the path.
+@bp.route("/app/")
+@bp.route("/app/<path:subpath>")
+def spa(subpath: str = ""):
+    dist = os.path.join(current_app.root_path, "static", "dist")
+    if subpath and os.path.isfile(os.path.join(dist, subpath)):
+        return send_from_directory(dist, subpath)
+    return send_from_directory(dist, "index.html")

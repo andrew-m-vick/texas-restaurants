@@ -16,6 +16,9 @@ airflow/airflow.cfg
 airflow/webserver_config.py
 data/
 !app/static/data/
+
+# Vite builds the React app here. Generated, not committed.
+app/static/dist/
 dist/
 build/
 *.egg-info/
