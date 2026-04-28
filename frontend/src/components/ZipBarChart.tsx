@@ -1,21 +1,8 @@
 // Wraps Chart.js for ZIP-level bar charts. Encapsulates the shared
 // visual choices (favicon-orange fill, click-to-drill-into-Browse).
-import {
-  BarController,
-  BarElement,
-  CategoryScale,
-  Chart as ChartJS,
-  LinearScale,
-  Tooltip,
-} from 'chart.js';
-import { useNavigate } from 'react-router-dom';
 import { Bar } from 'react-chartjs-2';
-
-ChartJS.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
-ChartJS.defaults.color = '#8b93a4';
-ChartJS.defaults.borderColor = '#262b36';
-
-const ZIP_COLOR = '#f9844a';
+import { useNavigate } from 'react-router-dom';
+import { ZIP_COLOR } from '../lib/charts-setup';
 
 interface Row {
   zip: string;

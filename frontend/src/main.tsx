@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './lib/charts-setup';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('missing #root');

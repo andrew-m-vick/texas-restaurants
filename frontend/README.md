@@ -39,8 +39,14 @@ frontend/
     │   ├── SearchBox.tsx       # debounced typeahead over /static/data/search.json
     │   └── ZipBarChart.tsx     # shared chart wrapper for ZIP-level bars
     └── pages/
-        ├── Overview.tsx        # ✅ fully ported — use this as the template
-        └── Stub.tsx            # placeholder routes (every other page)
+        ├── Overview.tsx
+        ├── Revenue.tsx
+        ├── Inspections.tsx
+        ├── Correlation.tsx
+        ├── Map.tsx
+        ├── Browse.tsx
+        ├── Ops.tsx
+        └── EstablishmentDetail.tsx
 ```
 
 ## Local dev
@@ -67,9 +73,9 @@ npm run build
 
 Vite writes to `../app/static/dist/`. Flask serves it via the catchall `/app/<path>` route in `app/routes.py`. Railway's build command should run the Vite build before booting Flask — see "Deploy" below.
 
-## Porting a page — the pattern (copy `Overview.tsx`)
+## Page pattern
 
-Every page follows the same shape:
+Every page follows the same shape — copy [`Overview.tsx`](src/pages/Overview.tsx):
 
 ```tsx
 import type { SomeData } from '../types';
@@ -87,26 +93,12 @@ export default function MyPage() {
 }
 ```
 
-Then in `App.tsx`, replace the `<Stub ... />` for that route with `<MyPage />`.
-
-### What each remaining page needs
-
-| Page | JSON file(s) | Patterns to use |
-| --- | --- | --- |
-| **Revenue** | `revenue-{w}.json` | `<Line>` for monthly time series, `<Bar>` for `by_zip` (reuse `ZipBarChart`) |
-| **Inspections** | `inspections-{w}.json` | `<Doughnut>` for distribution, sortable `<table>` for `repeat_offenders` (lift `useState` for sort col + dir, derive rows with `useMemo`) |
-| **Correlation** | `correlation-{w}.json` + `lifecycle.json` | Two `<Scatter>` charts (score↔revenue with confidence slider, tenure↔score), one `<Doughnut>` for permit status, sortable churn table. Confidence slider is a `useState` controlled input that filters before re-rendering. |
-| **Map** | `map-{w}.json` + `establishments-{w}.json` | `<MapContainer>` + `<TileLayer>` + `<CircleMarker>` from `react-leaflet`. Side panel filters establishments client-side by ZIP. |
-| **Browse** | `establishments-{w}.json` | The most state-heavy page. Use `useSearchParams` for filter inputs (q, zip, match, min/max score, sort, dir, page) so URLs stay shareable. Use `useMemo` to derive filtered+sorted+paginated rows from the full bundle. |
-| **Ops** | `ops.json` | Two tables. `useMemo` for sorting. |
-| **Establishment detail** | `establishment/:id.json` | `useParams()` for the ID. `<Line>` for inspection history, stacked `<Bar>` for revenue, plain `<table>` for licenses. |
-
 ### Conventions
 
 - **Don't fetch in `useEffect`** unless you need it. `useData<T>()` already handles loading/error/cancellation and caches by URL.
 - **Type every JSON shape in `types.ts`.** This is the single source of truth between Python and the UI.
 - **Keep imperative library boundaries narrow.** Wrap Chart.js / Leaflet in component files (`ZipBarChart.tsx` is the model). Don't pepper raw `Chart.js` calls across pages.
-- **Mirror the legacy CSS classes** (`.kpi`, `.card`, `.grid-2`, `.empty-msg`, etc.). Don't introduce a new design system mid-port.
+- **Mirror the legacy CSS classes** (`.kpi`, `.card`, `.grid-2`, `.empty-msg`, etc.) so the React build inherits the existing visual identity.
 
 ## Deploy notes (TODO when port is complete)
 
