@@ -33,7 +33,8 @@ This is a genuine null result, and I think that's more interesting than a contri
 | Geocoding | `pgeocode` (offline US postal-code centroids) |
 | Orchestration | Apache Airflow (+ GitHub Actions cron for hosted refresh) |
 | Serving | Flask (static-only — no DB at runtime) |
-| Frontend | Chart.js, Leaflet, vanilla JS, PWA (manifest + service worker) |
+| Frontend (legacy) | Chart.js, Leaflet, vanilla JS, PWA (manifest + service worker), served at `/` |
+| Frontend (SPA) | React 18, TypeScript (strict), React Router v6, react-chartjs-2, react-leaflet, Vite, served at `/app/*` |
 | Infra | Docker Compose (Postgres, local) · GitHub Actions (ETL) · Railway (Flask hosting) |
 
 ## Data sources
@@ -81,9 +82,10 @@ This is a genuine null result, and I think that's more interesting than a contri
                                  │  git commit + push
                                  ▼
                      ┌────────────────────────┐
-                     │  Flask + Chart.js      │
-                     │  + Leaflet dashboard   │
-                     │  (no DB at runtime)    │
+                     │  Flask (no DB at       │
+                     │  runtime) — serves:    │
+                     │  /      vanilla JS UI  │
+                     │  /app/  React SPA      │
                      └────────────────────────┘
 ```
 
@@ -101,6 +103,15 @@ What this means practically:
 - **Tradeoff**: data is only as fresh as the last commit. For a dataset whose source itself updates monthly, this is a non-issue.
 
 Because every response is a static file, turning the site into a PWA is essentially free. A [manifest](app/static/manifest.webmanifest) + [service worker](app/static/sw.js) precache the shell on install and serve pages and JSON stale-while-revalidate. The site is installable on desktop and iOS/Android, and once loaded works fully offline.
+
+### Two frontends, one backend
+
+The same `/static/data/*.json` files feed two independent UIs:
+
+- **Vanilla JS dashboard at `/`** — Flask templates + plain Chart.js/Leaflet. The original implementation; ~600 lines of JS across five files.
+- **React SPA at `/app/*`** — Vite + React 18 + TypeScript (strict). Mirror of the vanilla site built to demonstrate component-driven architecture. See [`frontend/`](frontend/) — typed JSON contracts in [`types.ts`](frontend/src/types.ts), a custom [`useData<T>()`](frontend/src/lib/data.ts) hook with caching, [`useSortable<T, K>`](frontend/src/lib/sort.ts) for table headers, [`useSearchParams`](frontend/src/pages/Browse.tsx) for shareable filter state, and `react-leaflet` / `react-chartjs-2` for the imperative-library boundaries.
+
+Same data, same conclusions, different stack — the React port doesn't change the analysis, it just shows the architecture survives a frontend rewrite without backend changes (because there isn't one — only static files).
 
 ### Why medallion?
 
@@ -175,6 +186,17 @@ python -m pipeline.export.static_json   # bakes /static/data/*.json
 python run.py   # http://localhost:5000
 ```
 
+### Building the React SPA
+
+```bash
+cd frontend
+npm install
+npm run build       # writes ../app/static/dist (committed; Railway serves directly)
+npm run dev         # optional — Vite dev server with HMR at :5173
+```
+
+The React app at `/app/*` consumes the same `/static/data/*.json` files; `frontend/README.md` documents the page conventions.
+
 ### Optional: Socrata app token
 
 Both TX and Austin portals throttle anonymous requests. Register a free token at [dev.socrata.com](https://dev.socrata.com/register) and set `SOCRATA_APP_TOKEN` in `.env` — ingests go noticeably faster.
@@ -219,10 +241,21 @@ texas-restaurants/
 │   ├── config.py, db.py, ops.py, socrata.py
 ├── airflow/dags/         # DAG definitions
 ├── .github/workflows/    # Hosted refresh cron
-├── app/                  # Flask dashboard
+├── app/                  # Flask shell — serves vanilla JS UI at / and React SPA at /app/*
 │   ├── routes.py
-│   ├── templates/
-│   └── static/{css,js}/
+│   ├── templates/        # Legacy vanilla-JS dashboard
+│   └── static/
+│       ├── css/, js/     # Legacy assets
+│       ├── data/         # Pre-materialized JSON (committed by ETL)
+│       └── dist/         # Vite build output for the React SPA (committed)
+├── frontend/             # Vite + React + TypeScript SPA (mounts at /app/*)
+│   ├── src/
+│   │   ├── pages/        # One component per legacy tab
+│   │   ├── components/   # SearchBox, ZipBarChart, Loading
+│   │   ├── lib/          # useData, useWindow, useSortable, format
+│   │   └── types.ts      # JSON-shape contract with the Python pipeline
+│   ├── vite.config.ts
+│   └── package.json
 ├── tests/
 ├── docker-compose.yml
 ├── requirements.txt
