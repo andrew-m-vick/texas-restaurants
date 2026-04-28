@@ -100,6 +100,21 @@ def service_worker():
 @bp.route("/app/<path:subpath>")
 def spa(subpath: str = ""):
     dist = os.path.join(current_app.root_path, "static", "dist")
+    index = os.path.join(dist, "index.html")
+    if not os.path.isfile(index):
+        # Nixpacks build phase didn't produce the React bundle. Tell the
+        # operator what's missing instead of returning a generic 404.
+        listing = []
+        if os.path.isdir(dist):
+            listing = sorted(os.listdir(dist))[:50]
+        return (
+            f"<h1>React build missing</h1>"
+            f"<p>Expected <code>{index}</code> but it isn't there.</p>"
+            f"<p>dist exists: <b>{os.path.isdir(dist)}</b></p>"
+            f"<p>dist contents: <code>{listing or '(empty or missing)'}</code></p>"
+            f"<p>Check the Railway build log for the <code>npm run build</code> step.</p>",
+            503,
+        )
     if subpath and os.path.isfile(os.path.join(dist, subpath)):
         return send_from_directory(dist, subpath)
     return send_from_directory(dist, "index.html")
