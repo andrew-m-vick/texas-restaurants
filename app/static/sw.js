@@ -4,7 +4,7 @@
 // at runtime so pages and JSON data files load instantly from cache and
 // update in the background. Bump CACHE_VERSION whenever the shell changes.
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `austin-rest-${CACHE_VERSION}`;
 
 const SHELL = [
@@ -64,16 +64,24 @@ self.addEventListener('fetch', (event) => {
   // (Chart.js, Leaflet, tile images) keep their own HTTP caching.
   if (url.origin !== self.location.origin) return;
 
+  // Pass navigation requests straight through. Caching HTML pages risks
+  // serving stale shells after a deploy, and any redirect (e.g. /app → /app/)
+  // breaks the SPA when the cached request mode disallows redirects.
+  if (request.mode === 'navigate') return;
+
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cached = await cache.match(request);
       const network = fetch(request)
         .then((resp) => {
-          if (resp && resp.ok) cache.put(request, resp.clone());
+          // Skip redirects and opaque responses — they can't be replayed
+          // safely from cache for arbitrary request modes.
+          if (resp && resp.ok && !resp.redirected && resp.type === 'basic') {
+            cache.put(request, resp.clone());
+          }
           return resp;
         })
         .catch(() => cached);
-      // Serve cached immediately if we have it; either way update in the bg.
       return cached || network;
     })
   );

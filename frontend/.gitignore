@@ -3,3 +3,10 @@ dist/
 *.log
 .vite/
 .DS_Store
+
+# TypeScript: Vite handles compilation, tsc is type-check only.
+# These are accidental emit artifacts if tsc emits to src/.
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+tsconfig.tsbuildinfo

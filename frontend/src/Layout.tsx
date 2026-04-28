@@ -2,14 +2,17 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useWindow, WINDOWS } from './lib/window';
 import SearchBox from './components/SearchBox';
 
+// Paths are relative to the BrowserRouter basename ('/app'); React
+// Router prepends the basename automatically, so '/' here resolves to
+// '/app/' in the URL bar.
 const TABS = [
-  { to: '/app/', label: 'Overview', end: true },
-  { to: '/app/revenue', label: 'Revenue' },
-  { to: '/app/inspections', label: 'Inspections' },
-  { to: '/app/correlation', label: 'Correlation' },
-  { to: '/app/map', label: 'Map' },
-  { to: '/app/establishments', label: 'Browse' },
-  { to: '/app/ops', label: 'Pipeline' },
+  { to: '/', label: 'Overview', end: true },
+  { to: '/revenue', label: 'Revenue' },
+  { to: '/inspections', label: 'Inspections' },
+  { to: '/correlation', label: 'Correlation' },
+  { to: '/map', label: 'Map' },
+  { to: '/establishments', label: 'Browse' },
+  { to: '/ops', label: 'Pipeline' },
 ];
 
 export default function Layout() {

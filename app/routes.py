@@ -93,6 +93,9 @@ def service_worker():
 # `base: '/app/'`, so all bundle URLs resolve under that prefix.
 # Real files (assets/index-*.js, etc.) are served as-is; anything else
 # falls back to index.html so client-side routing handles the path.
+# Both /app and /app/ are explicit routes (not a redirect) so service
+# workers don't choke on a 308 to a same-resource URL.
+@bp.route("/app")
 @bp.route("/app/")
 @bp.route("/app/<path:subpath>")
 def spa(subpath: str = ""):

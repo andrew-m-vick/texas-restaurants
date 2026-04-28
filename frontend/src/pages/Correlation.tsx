@@ -176,8 +176,8 @@ export default function Correlation() {
                 },
                 {
                   label: 'Regression',
-                  type: 'line' as const,
                   data: corrRegression,
+                  showLine: true,
                   borderColor: '#f9844a',
                   backgroundColor: 'transparent',
                   pointRadius: 0,
@@ -269,8 +269,8 @@ export default function Correlation() {
                 },
                 {
                   label: 'Regression',
-                  type: 'line' as const,
                   data: tenureRegression,
+                  showLine: true,
                   borderColor: '#f9844a',
                   backgroundColor: 'transparent',
                   pointRadius: 0,
@@ -326,7 +326,7 @@ export default function Correlation() {
 
       <div className="card" style={{ marginTop: '1.5rem' }}>
         <h2>TABC permit status</h2>
-        <div style={{ maxHeight: 260 }}>
+        <div style={{ height: 320, maxWidth: 520, margin: '0 auto' }}>
           <Doughnut
             data={{
               labels: life.data.status.map((r) => r.status || '—'),

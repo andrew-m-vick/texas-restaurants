@@ -57,30 +57,29 @@ export default function Inspections() {
   return (
     <>
       <h1>Inspections</h1>
-      <div className="grid-2">
-        <div className="card">
-          <h2>Score distribution</h2>
-          {!d.distribution.length ? (
-            <Empty label="No score data." />
-          ) : (
-            <div style={{ height: 280 }}>
-              <Doughnut
-                data={{
-                  labels: d.distribution.map((r) => r.score_bucket),
-                  datasets: [
-                    { data: d.distribution.map((r) => r.inspections), backgroundColor: PALETTE },
-                  ],
-                }}
-                options={{
-                  maintainAspectRatio: false,
-                  plugins: { legend: { position: 'right' } },
-                }}
-              />
-            </div>
-          )}
-        </div>
-        <div className="card">
-          <h2>Repeat low-score establishments</h2>
+      <div className="card">
+        <h2>Score distribution</h2>
+        {!d.distribution.length ? (
+          <Empty label="No score data." />
+        ) : (
+          <div style={{ height: 320, maxWidth: 520, margin: '0 auto' }}>
+            <Doughnut
+              data={{
+                labels: d.distribution.map((r) => r.score_bucket),
+                datasets: [
+                  { data: d.distribution.map((r) => r.inspections), backgroundColor: PALETTE },
+                ],
+              }}
+              options={{
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } },
+              }}
+            />
+          </div>
+        )}
+      </div>
+      <div className="card">
+        <h2>Repeat low-score establishments</h2>
           {!sorted.length ? (
             <Empty label="No repeat low-score establishments." />
           ) : (
@@ -112,7 +111,6 @@ export default function Inspections() {
               </tbody>
             </table>
           )}
-        </div>
       </div>
     </>
   );
